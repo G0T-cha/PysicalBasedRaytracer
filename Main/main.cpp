@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Framebuffer initialized." << std::endl;
 
-    // 相机参数初始化
+    //相机参数初始化
     std::shared_ptr<Camera> cam;
     Point3f eye(-3.0f, 1.5f, -3.0f), look(0.0, 0.0, 0.0f);
     Vector3f up(0.0f, 1.0f, 0.0f);
@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
     Transform Camera2World = Inverse(lookat);
     cam = std::shared_ptr<Camera>(CreatePerspectiveCamera(WIDTH, HEIGHT, Camera2World));
 
+    //常量纹理
     PBR::Spectrum floorColor; floorColor[0] = 0.2; floorColor[1] = 0.3; floorColor[2] = 0.9;
     PBR::Spectrum dragonColor; dragonColor[0] = 1.0; dragonColor[1] = 1.0; dragonColor[2] = 0.0;
     std::shared_ptr<PBR::Texture<PBR::Spectrum>> KdDragon = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(dragonColor);
@@ -83,6 +84,7 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<Material> mirrorMaterial = std::make_shared<MirrorMaterial>(KrMirror, bumpMap);
     std::cout << "Material initialized." << std::endl;
 
+    //地板
     int nTrianglesFloor = 2;
     int vertexIndicesFloor[6] = { 0,1,2,3,4,5 };
     int nVerticesFloor = 6;
@@ -110,7 +112,7 @@ int main(int argc, char* argv[]) {
     tri_Object2World = Translate(Vector3f(0.0, -2.5, 0.0)) * tri_Object2World;
     tri_World2Object = Inverse(tri_Object2World);
 
-    plyi = new PBR::plyInfo("C:/Users/99531/Desktop/book/0 - OriginProject/Resources/dragon.3d");
+    plyi = new PBR::plyInfo("C:/Users/99531/Desktop/book/PBR-v1/Resources/dragon.3d");
 
     mesh = std::make_shared<PBR::TriangleMesh>(tri_Object2World, plyi->nTriangles, plyi->vertexIndices, plyi->nVertices, plyi->vertexArray, nullptr, nullptr, nullptr, nullptr);
     tris.reserve(plyi->nTriangles);
@@ -123,6 +125,7 @@ int main(int argc, char* argv[]) {
     
     agg = std::make_shared<BVHAccel>(prims, 1, BVHAccel::SplitMethod::SAH);
 
+    //灯光
     std::vector<std::shared_ptr<Light>> lights;
 
     Transform SkyBoxToWorld;
@@ -130,7 +133,7 @@ int main(int argc, char* argv[]) {
     float SkyBoxRadius = 10.0f;
     std::shared_ptr<SkyBoxLight> skyBoxLight =
         std::make_shared<SkyBoxLight>(SkyBoxToWorld, SkyBoxCenter,
-            SkyBoxRadius, "C:/Users/99531/Desktop/book/0 - OriginProject/Resources/puresky_1k.hdr", 1);
+            SkyBoxRadius, "C:/Users/99531/Desktop/book/PBR-v1/Resources/puresky_1k.hdr", 1);
     lights.push_back(skyBoxLight);
 
     /*int nTrianglesAreaLight = 2; //面光源数（三角形数）
@@ -185,7 +188,7 @@ int main(int argc, char* argv[]) {
     }*/
 
     std::cout << "Scene created. Starting render..." << std::endl;
-
+    //采样器
     Bounds2i imageBound(Point2i(0, 0), Point2i(WIDTH, HEIGHT));
     std::shared_ptr<Sampler> mainSampler = std::make_shared<PBR::HaltonSampler>(
         samples_per_pixel, // 每个像素的样本数
@@ -195,18 +198,18 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<Scene> worldScene =
         std::make_unique<Scene>(agg, lights);
     Bounds2i ScreenBound(Point2i(0, 0), Point2i(WIDTH, HEIGHT));
-
+    //积分器
     std::shared_ptr<Integrator> integrator = std::make_shared<WhittedIntegrator>(
         5, cam, mainSampler, ScreenBound, framebuffer
         );
-
+    //开始渲染
     double frameTime;
     integrator->Render(*worldScene, frameTime);
 
     std::cout << std::endl;
     std::cout << "Render finished." << std::endl;
 
-    // 6. 保存结果到 PNG 文件
+    // 保存结果到 PNG 文件
     const char* filename = "render_final_parallel.png";
     int channels = 4;
     int stride_in_bytes = WIDTH * channels;
@@ -219,7 +222,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Failed to save image." << std::endl;
     }
 
-    // 7. 清理资源
+    // 清理资源
     delete framebuffer;
     delete plyi;
 
