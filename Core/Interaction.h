@@ -8,7 +8,6 @@
 
 namespace PBR {
 	struct Interaction {
-		// Interaction Public Methods
 		Interaction() : time(0) {}
 		Interaction(const Point3f& p, const Normal3f& n, const Vector3f& pError,
 			const Vector3f& wo, float time)
@@ -17,20 +16,22 @@ namespace PBR {
 			pError(pError),
 			wo(Normalize(wo)),
 			n(n) {}
-		// Interaction Public Data
 		Interaction(const Point3f& p, const Vector3f& wo, float time)
 			: p(p), time(time), wo(wo) {}
 		Interaction(const Point3f& p, float time)
 			: p(p), time(time) {}
+		//偏移光线
 		Ray SpawnRay(const Vector3f& d) const {
 			Point3f o = OffsetRayOrigin(p, pError, n, d);
 			return Ray(o, d, Infinity, time);
 		}
+		//阴影
 		Ray SpawnRayTo(const Point3f& p2) const {
 			Point3f origin = OffsetRayOrigin(p, pError, n, p2 - p);
 			Vector3f d = p2 - p;
 			return Ray(origin, d, 1 - ShadowEpsilon, time);
 		}
+		//偏移阴影
 		Ray SpawnRayTo(const Interaction& it) const {
 			Point3f origin = OffsetRayOrigin(p, pError, n, it.p - p);
 			Point3f target = OffsetRayOrigin(it.p, it.pError, it.n, origin - it.p);
@@ -46,7 +47,6 @@ namespace PBR {
 
 	class SurfaceInteraction : public Interaction {
 	public:
-		// SurfaceInteraction Public Methods
 		SurfaceInteraction() {}
 		SurfaceInteraction(const Point3f& p, const Vector3f& pError,
 			const Point2f& uv, const Vector3f& wo,

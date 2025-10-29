@@ -9,8 +9,8 @@ namespace PBR {
 template <typename T>
 class ConstantTexture : public Texture<T> {
   public:
-    // ConstantTexture Public Methods
     ConstantTexture(const T &value) : value(value) {}
+    //·µ»Ø³£Á¿
     T Evaluate(const SurfaceInteraction &) const { return value; }
 
   private:

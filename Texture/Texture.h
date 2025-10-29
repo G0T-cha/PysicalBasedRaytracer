@@ -10,7 +10,7 @@ namespace PBR{
 template <typename T>
 class Texture {
   public:
-    // Texture Interface
+    // 返回光谱或浮点数等
     virtual T Evaluate(const SurfaceInteraction &) const = 0;
     virtual ~Texture() {}
 };

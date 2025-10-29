@@ -24,7 +24,7 @@ public:
 		this->height = 0;
 		this->channals = 0;
 	}
-
+	//初始化缓冲区
 	void InitBuffer(const int width = 800, const int height = 600, const int channals = 4) {
 		this->width = width;
 		this->height = height;
@@ -64,7 +64,7 @@ public:
 		}
 		if (nullptr != ubuffer) delete[] ubuffer;
 		if (nullptr != fbuffer) delete[] fbuffer;
-		this->width = width; this->height = width;
+		this->width = width; this->height = height;
 		ubuffer = new unsigned char[width * height * channals];
 		fbuffer = new float[width * height * channals];
 		if (nullptr == ubuffer || nullptr == fbuffer) {
@@ -80,7 +80,7 @@ public:
 		}
 		return true;
 	}
-
+	//直接设置像素值
 	inline bool set_uc(const int w, const int h, const int shifting, const unsigned char& dat) {
 		if (nullptr == ubuffer) {
 			//TextDinodonS("Access Error: Buffer is empty and cannot be accessed!");
@@ -124,7 +124,7 @@ public:
 		ubuffer[offset] = fbuffer[offset] * 255;
 		return true;
 	}
-
+	//返回LDR缓冲区
 	unsigned char* getUCbuffer() { return ubuffer; }
 
 private:

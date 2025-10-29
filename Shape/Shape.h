@@ -24,13 +24,11 @@ namespace PBR {
 		}
 		virtual float Area() const = 0;
 
-		// Sample a point on the surface of the shape and return the PDF with
-		// respect to area on the surface.
+		// 形状在自己表面积均匀采样，pdf是1/表面积
 		virtual Interaction Sample(const Point2f& u, float* pdf) const = 0;
 		virtual float Pdf(const Interaction&) const { return 1 / Area(); }
 
-		// Sample a point on the shape given a reference point |ref| and
-		// return the PDF with respect to solid angle from |ref|.
+		// 立体角采样
 		virtual Interaction Sample(const Interaction& ref, const Point2f& u, float* pdf) const;
 		virtual float Pdf(const Interaction& ref, const Vector3f& wi) const;
 

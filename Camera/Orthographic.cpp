@@ -6,20 +6,16 @@ namespace PBR {
 
 	float OrthographicCamera::GenerateRay(const CameraSample& sample,
 		Ray* ray) const {
-		// Compute raster and camera sample positions
+		
 		Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
 		Point3f pCamera = RasterToCamera(pFilm);
+		//光线不再全从原点出发
 		*ray = Ray(pCamera, Vector3f(0, 0, 1));
-		// Modify ray for depth of field
+		
 		if (lensRadius > 0) {
-			// Sample point on lens
 			Point2f pLens = lensRadius * ConcentricSampleDisk(sample.pLens);
-
-			// Compute point on plane of focus
 			float ft = focalDistance / ray->d.z;
 			Point3f pFocus = (*ray)(ft);
-
-			// Update ray for effect of lens
 			ray->o = Point3f(pLens.x, pLens.y, 0);
 			ray->d = Normalize(pFocus - ray->o);
 		}

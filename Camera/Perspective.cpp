@@ -2,35 +2,36 @@
 #include "Sampler\Sampling.h"
 
 namespace PBR {
+	//Perspective(fov, 1e-2f, 1000.f)创建透视投影矩阵
 	PerspectiveCamera::PerspectiveCamera(const int RasterWidth, const int RasterHeight, const Transform& CameraToWorld,
 		const Bounds2f& screenWindow, float lensRadius, float focalDistance, float fov)
 		: ProjectiveCamera(RasterWidth, RasterHeight, CameraToWorld, Perspective(fov, 1e-2f, 1000.f),
 			screenWindow, lensRadius, focalDistance) {
 
 		// Compute image plane bounds at $z=1$ for _PerspectiveCamera_
-		Point2i res = Point2i(RasterWidth, RasterHeight);
+		/*Point2i res = Point2i(RasterWidth, RasterHeight);
 		Point3f pMin = RasterToCamera(Point3f(0, 0, 0));
 		Point3f pMax = RasterToCamera(Point3f(res.x, res.y, 0));
 		pMin /= pMin.z;
-		pMax /= pMax.z;
+		pMax /= pMax.z;*/
 	}
 
 	float PerspectiveCamera::GenerateRay(const CameraSample& sample,
 		Ray* ray) const {
-		// Compute raster and camera sample positions
+		// 生成针孔光线
 		Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
 		Point3f pCamera = RasterToCamera(pFilm);
 		*ray = Ray(Point3f(0, 0, 0), Normalize(Vector3f(pCamera)));
-		// Modify ray for depth of field
+		// 生成景深光线
 		if (lensRadius > 0) {
-			// Sample point on lens
+			// 圆盘随机取样
 			Point2f pLens = lensRadius * ConcentricSampleDisk(sample.pLens);
 
-			// Compute point on plane of focus
+			// 针孔光线与焦平面的交点
 			float ft = focalDistance / ray->d.z;
 			Point3f pFocus = (*ray)(ft);
 
-			// Update ray for effect of lens
+			// 新光线
 			ray->o = Point3f(pLens.x, pLens.y, 0);
 			ray->d = Normalize(pFocus - ray->o);
 		}
@@ -38,6 +39,7 @@ namespace PBR {
 		return 1;
 	}
 
+	//创建相机，赋默认参数
 	PerspectiveCamera* CreatePerspectiveCamera(const int RasterWidth, const int RasterHeight, const Transform& cam2world) {
 		float lensradius = 0.0f;
 		float focaldistance = 0.0f;

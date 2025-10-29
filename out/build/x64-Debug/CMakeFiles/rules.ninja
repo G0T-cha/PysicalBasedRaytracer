@@ -47,7 +47,7 @@ rule CUSTOM_COMMAND
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = "D:\VS\Visual Studio\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --regenerate-during-build -S"C:\Users\99531\Desktop\book\0 - OriginProject" -B"C:\Users\99531\Desktop\book\0 - OriginProject\out\build\x64-Debug"
+  command = "D:\VS\Visual Studio\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --regenerate-during-build -SC:\Users\99531\Desktop\book\PBR-v1 -BC:\Users\99531\Desktop\book\PBR-v1\out\build\x64-Debug
   description = Re-running CMake...
   generator = 1
 

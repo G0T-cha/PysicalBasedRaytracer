@@ -9,7 +9,7 @@ namespace PBR {
         bool testAlphaTexture) const {
 
         Point3f pHit;
-        // Transform _Ray_ to object space
+        //将光线转化到物体空间求交
         Ray ray = (*WorldToObject)(r);
 
         Vector3f oc = ray.o - Point3f(0.0f, 0.0f, 0.0f);

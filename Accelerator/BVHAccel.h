@@ -10,33 +10,28 @@
 
 namespace PBR {
 	struct BVHBuildNode;
-
-	// BVHAccel Forward Declarations
 	struct BVHPrimitiveInfo;
 	struct LinearBVHNode;
 
 	class BVHAccel : public Aggregate {
 	public:
-		// BVHAccel Public Types
 		enum class SplitMethod { SAH, HLBVH, Middle, EqualCounts };
-
-		// BVHAccel Public Methods
 		BVHAccel(std::vector<std::shared_ptr<Primitive>> p,
 			int maxPrimsInNode = 1,
 			SplitMethod splitMethod = SplitMethod::SAH);
 		Bounds3f WorldBound() const;
 		~BVHAccel();
+		//渲染光线时执行，触发遍历
 		bool Intersect(const Ray& ray, SurfaceInteraction* isect) const;
 		bool IntersectP(const Ray& ray) const;
 
 	private:
-		// BVHAccel Private Methods
+		//递归建树
 		BVHBuildNode* recursiveBuild(std::vector<BVHPrimitiveInfo>& primitiveInfo,
 			int start, int end, int* totalNodes,
 			std::vector<std::shared_ptr<Primitive>>& orderedPrims);
+		//树的扁平化
 		int flattenBVHTree(BVHBuildNode* node, int* offset);
-
-		// BVHAccel Private Data
 		const int maxPrimsInNode;
 		const SplitMethod splitMethod;
 		std::vector<std::shared_ptr<Primitive>> primitives;
@@ -44,4 +39,4 @@ namespace PBR {
 	};
 
 }
-#endif // !BVHACCEL_H
+#endif

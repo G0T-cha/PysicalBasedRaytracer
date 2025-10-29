@@ -4,7 +4,6 @@
 #include "Light\DiffuseLight.h"
 
 namespace PBR {
-	// SurfaceInteraction Method Definitions
 	SurfaceInteraction::SurfaceInteraction(
 		const Point3f& p, const Vector3f& pError, const Point2f& uv,
 		const Vector3f& wo, const Vector3f& dpdu, const Vector3f& dpdv,
@@ -17,14 +16,13 @@ namespace PBR {
 		dndu(dndu),
 		dndv(dndv),
 		shape(shape) {
-		// Initialize shading geometry from true geometry
 		shading.n = n;
 		shading.dpdu = dpdu;
 		shading.dpdv = dpdv;
 		shading.dndu = dndu;
 		shading.dndv = dndv;
 
-		// Adjust normal based on orientation and handedness
+		// 判断是否需要反转法向量
 		if (shape &&
 		(shape->reverseOrientation ^ shape->transformSwapsHandedness)) {
 		n *= -1;
@@ -36,14 +34,14 @@ namespace PBR {
 		if (bsdf)
 			bsdf->~BSDF();
 	}
-
+	//计算散射
 	void SurfaceInteraction::ComputeScatteringFunctions(const Ray& ray,
 		bool allowMultipleLobes,
 		TransportMode mode) {
 		primitive->ComputeScatteringFunctions(this, mode,
 			allowMultipleLobes);
 	}
-
+	//判断是否需要累加自发光
 	Spectrum SurfaceInteraction::Le(const Vector3f& w) const {
 		const AreaLight* area = primitive->GetAreaLight();
 		return area ? area->L(*this, w) : Spectrum(0.f);

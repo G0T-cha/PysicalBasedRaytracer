@@ -52,7 +52,8 @@ namespace PBR {
 				std::swap(samp[nDimensions * i + j], samp[nDimensions * other + j]);
 		}
 	}
-
+	//余弦加权半球采样-理想漫反射进行重要性采样
+	//普通的 UniformSampleHemisphere 会浪费大量样本在 cos(theta) 接近 0 的方向上，这些方向对最终颜色的贡献很小。
 	inline Vector3f CosineSampleHemisphere(const Point2f& u) {
 		Point2f d = ConcentricSampleDisk(u);
 		float z = std::sqrt(std::max((float)0, 1 - d.x * d.x - d.y * d.y));
@@ -61,6 +62,7 @@ namespace PBR {
 
 	inline float CosineHemispherePdf(float cosTheta) { return cosTheta * InvPi; }
 
+	//MIS多重重要性采样
 	inline float BalanceHeuristic(int nf, float fPdf, int ng, float gPdf) {
 		return (nf * fPdf) / (nf * fPdf + ng * gPdf);
 	}

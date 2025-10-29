@@ -5,11 +5,9 @@
 #include "Texture\Texture.h"
 
 namespace PBR {
-
-    // MatteMaterial Declarations
     class MatteMaterial : public Material {
     public:
-        // MatteMaterial Public Methods
+        // Âþ·´ÉäÑÕÉ«¡¢´Ö²Ú¶È¡¢°¼Í¹ÌùÍ¼
         MatteMaterial(const std::shared_ptr<Texture<Spectrum>>& Kd,
             const std::shared_ptr<Texture<float>>& sigma,
             const std::shared_ptr<Texture<float>>& bumpMap)
@@ -17,9 +15,7 @@ namespace PBR {
         void ComputeScatteringFunctions(SurfaceInteraction* si,
             TransportMode mode,
             bool allowMultipleLobes) const;
-
     private:
-        // MatteMaterial Private Data
         std::shared_ptr<Texture<Spectrum>> Kd;
         std::shared_ptr<Texture<float>> sigma, bumpMap;
     };

@@ -5,19 +5,15 @@
 #include "Core/PBR.h"
 
 namespace PBR {
-// TransportMode Declarations
 enum class TransportMode { Radiance, Importance };
-
-// Material Declarations
 class Material {
   public:
-    // Material Interface
+    //º∆À„…¢…‰∫Ø ˝
     virtual void ComputeScatteringFunctions(SurfaceInteraction *si,
                                             TransportMode mode,
                                             bool allowMultipleLobes) const = 0;
     virtual ~Material() {}
 };
-
 }
 
 

@@ -2,7 +2,7 @@
 
 
 namespace PBR {
-	// Sampling Function Definitions
+	// 分层采样
 	void StratifiedSample1D(float* samp, int nSamples, RNG& rng, bool jitter) {
 		float invNSamples = (float)1 / nSamples;
 		for (int i = 0; i < nSamples; ++i) {
@@ -10,7 +10,7 @@ namespace PBR {
 			samp[i] = std::min((i + delta) * invNSamples, OneMinusEpsilon);
 		}
 	}
-
+	
 	void StratifiedSample2D(Point2f* samp, int nx, int ny, RNG& rng, bool jitter) {
 		float dx = (float)1 / nx, dy = (float)1 / ny;
 		for (int y = 0; y < ny; ++y)
@@ -22,17 +22,14 @@ namespace PBR {
 				++samp;
 			}
 	}
-
+	// 拉丁超立方采样
 	void LatinHypercube(float* samples, int nSamples, int nDim, RNG& rng) {
-		// Generate LHS samples along diagonal
 		float invNSamples = (float)1 / nSamples;
 		for (int i = 0; i < nSamples; ++i)
 			for (int j = 0; j < nDim; ++j) {
 				float sj = (i + (rng.UniformFloat())) * invNSamples;
 				samples[nDim * i + j] = std::min(sj, OneMinusEpsilon);
 			}
-
-		// Permute LHS samples in each dimension
 		for (int i = 0; i < nDim; ++i) {
 			for (int j = 0; j < nSamples; ++j) {
 				int other = j + rng.UniformUInt32(nSamples - j);
@@ -40,7 +37,7 @@ namespace PBR {
 			}
 		}
 	}
-
+	//圆盘：拒绝采样-效率低
 	Point2f RejectionSampleDisk(RNG& rng) {
 		Point2f p;
 		do {
@@ -49,7 +46,7 @@ namespace PBR {
 		} while (p.x * p.x + p.y * p.y > 1);
 		return p;
 	}
-
+	//均匀半球（立体角
 	Vector3f UniformSampleHemisphere(const Point2f& u) {
 		float z = u[0];
 		float r = std::sqrt(std::max((float)0, (float)1. - z * z));
@@ -58,7 +55,7 @@ namespace PBR {
 	}
 
 	float UniformHemispherePdf() { return Inv2Pi; }
-
+	//均匀球体
 	Vector3f UniformSampleSphere(const Point2f& u) {
 		float z = 1 - 2 * u[0];
 		float r = std::sqrt(std::max((float)0, (float)1 - z * z));
@@ -67,13 +64,13 @@ namespace PBR {
 	}
 
 	float UniformSpherePdf() { return Inv4Pi; }
-
+	//圆盘：均匀采样
 	Point2f UniformSampleDisk(const Point2f& u) {
 		float r = std::sqrt(u[0]);
 		float theta = 2 * Pi * u[1];
 		return Point2f(r * std::cos(theta), r * std::sin(theta));
 	}
-
+	//同心圆盘映射
 	Point2f ConcentricSampleDisk(const Point2f& u) {
 		// Map uniform random numbers to $[-1,1]^2$
 		Point2f uOffset = 2.f * u - Vector2f(1, 1);
@@ -97,7 +94,7 @@ namespace PBR {
 	float UniformConePdf(float cosThetaMax) {
 		return 1 / (2 * Pi * (1 - cosThetaMax));
 	}
-
+	//圆锥体
 	Vector3f UniformSampleCone(const Point2f& u, float cosThetaMax) {
 		float cosTheta = ((float)1 - u[0]) + u[0] * cosThetaMax;
 		float sinTheta = std::sqrt((float)1 - cosTheta * cosTheta);
@@ -115,7 +112,7 @@ namespace PBR {
 		return std::cos(phi) * sinTheta * x + std::sin(phi) * sinTheta * y +
 			cosTheta * z;
 	}
-
+	//三角形采样
 	Point2f UniformSampleTriangle(const Point2f& u) {
 		float su0 = std::sqrt(u[0]);
 		return Point2f(1 - su0, u[1] * su0);

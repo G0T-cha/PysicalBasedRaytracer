@@ -7,11 +7,9 @@
 #include "Texture\Texture.h"
 
 namespace PBR {
-
-// MirrorMaterial Declarations
 class MirrorMaterial : public Material {
   public:
-    // MirrorMaterial Public Methods
+    //æµ√Ê∑¥…‰—’…´°¢∞ºÕπÃ˘Õº
     MirrorMaterial(const std::shared_ptr<Texture<Spectrum>> &r,
                    const std::shared_ptr<Texture<float>> &bump) {
         Kr = r;
@@ -21,7 +19,6 @@ class MirrorMaterial : public Material {
                                     bool allowMultipleLobes) const;
 
   private:
-    // MirrorMaterial Private Data
     std::shared_ptr<Texture<Spectrum>> Kr;
     std::shared_ptr<Texture<float>> bumpMap;
 };

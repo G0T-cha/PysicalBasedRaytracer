@@ -22,24 +22,19 @@ namespace PBR {
 			*pdf = 0;
 		else {
 			wi = Normalize(wi);
-			// Convert from area measure, as returned by the Sample() call
-			// above, to solid angle measure.
+			// 雅可比行列式，将面积pdf转化为立体角pdf
 			*pdf *= DistanceSquared(ref.p, intr.p) / AbsDot(intr.n, -wi);
 			if (std::isinf(*pdf)) *pdf = 0.f;
 		}
 		return intr;
 	}
 	float Shape::Pdf(const Interaction& ref, const Vector3f& wi) const {
-		// Intersect sample ray with area light geometry
+		//给定一个方向 wi，计算出光源采样策略采样到该方向的 PDF 值。
 		Ray ray = ref.SpawnRay(wi);
 		float tHit;
 		SurfaceInteraction isectLight;
-		// Ignore any alpha textures used for trimming the shape when performing
-		// this intersection. Hack for the "San Miguel" scene, where this is used
-		// to make an invisible area light.
 		if (!Intersect(ray, &tHit, &isectLight, false)) return 0;
-
-		// Convert light sample weight to solid angle measure
+		
 		float pdf = DistanceSquared(ref.p, isectLight.p) /
 			(AbsDot(isectLight.n, -wi) * Area());
 		if (std::isinf(pdf)) pdf = 0.f;

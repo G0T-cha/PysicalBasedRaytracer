@@ -2,8 +2,6 @@
 
 namespace PBR
 {
-
-	// DiffuseAreaLight Method Definitions
 	DiffuseAreaLight::DiffuseAreaLight(const Transform& LightToWorld,
 		const Spectrum& Lemit, int nSamples,
 		const std::shared_ptr<Shape>& shape,
@@ -18,16 +16,17 @@ namespace PBR
 		// for Triangles, since this doesn't matter for them.
 		// if (WorldToLight.HasScale() && dynamic_cast<const Triangle *>(shape.get()) == nullptr);
 	}
-
+	//（Φ = L * A * \pi)。
 	Spectrum DiffuseAreaLight::Power() const
 	{
 		return (twoSided ? 2 : 1) * Lemit * area * Pi;
 	}
-
+	// 光源采样
 	Spectrum DiffuseAreaLight::Sample_Li(const Interaction& ref, const Point2f& u,
 		Vector3f* wi, float* pdf,
 		VisibilityTester* vis) const
 	{
+		//按立体角进行形状采样
 		Interaction pShape = shape->Sample(ref, u, pdf);
 		if (*pdf == 0 || (pShape.p - ref.p).LengthSquared() == 0)
 		{
@@ -36,9 +35,10 @@ namespace PBR
 		}
 		*wi = Normalize(pShape.p - ref.p);
 		*vis = VisibilityTester(ref, pShape);
+		//返回自发光辐照度Radiance（不同于点光源强度衰减）
 		return L(pShape, -*wi);
 	}
-
+	//委托给形状，计算光源采样 PDF
 	float DiffuseAreaLight::Pdf_Li(const Interaction& ref,
 		const Vector3f& wi) const
 	{

@@ -9,7 +9,6 @@ namespace PBR {
 	static long long leafNodes = 0;
 
     BVHAccel::~BVHAccel() { free(nodes); }
-    // BVHAccel Local Declarations
     struct BVHPrimitiveInfo {
         BVHPrimitiveInfo() {}
         BVHPrimitiveInfo(size_t primitiveNumber, const Bounds3f& bounds)
@@ -22,7 +21,6 @@ namespace PBR {
     };
 
 	struct BVHBuildNode {
-		// BVHBuildNode Public Methods
 		void InitLeaf(int first, int n, const Bounds3f& b) {
 			firstPrimOffset = first;
 			nPrimitives = n;
@@ -48,12 +46,12 @@ namespace PBR {
 	struct LinearBVHNode {
 		Bounds3f bounds;
 		union {
-			int primitivesOffset;   // leaf
-			int secondChildOffset;  // interior
+			int primitivesOffset;   
+			int secondChildOffset;  
 		};
-		uint16_t nPrimitives;  // 0 -> interior node
-		uint8_t axis;          // interior node: xyz
-		uint8_t pad[1];        // ensure 32 byte total size
+		uint16_t nPrimitives;  
+		uint8_t axis;          
+		uint8_t pad[1];        
 	};
 
 	BVHAccel::BVHAccel(std::vector<std::shared_ptr<Primitive>> p,
@@ -62,25 +60,25 @@ namespace PBR {
 		splitMethod(splitMethod),
 		primitives(std::move(p)) {
 		if (primitives.empty()) return;
-		// Build BVH from _primitives_
 
-		// Initialize _primitiveInfo_ array for primitives
+		// 遍历图元，暂时存储包围盒和索引到primitiveInfo中
 		std::vector<BVHPrimitiveInfo> primitiveInfo(primitives.size());
 		for (size_t i = 0; i < primitives.size(); ++i)
 			primitiveInfo[i] = { i, primitives[i]->WorldBound() };
 
-		// Build BVH tree for primitives using _primitiveInfo_
+		// 递归建树
 		int totalNodes = 0;
 		std::vector<std::shared_ptr<Primitive>> orderedPrims;
 		orderedPrims.reserve(primitives.size());
 		BVHBuildNode* root;
-
 		root = recursiveBuild(primitiveInfo, 0, primitives.size(),
 			&totalNodes, orderedPrims);
+
+		// 图元重排，确保了叶子节点中的图元在内存中是连续的。
 		primitives.swap(orderedPrims);
 		primitiveInfo.resize(0);
 
-		// Compute representation of depth-first traversal of BVH tree
+		// 树的扁平化
 		treeBytes += totalNodes * sizeof(LinearBVHNode) + sizeof(*this) +
 			primitives.size() * sizeof(primitives[0]);
 		nodes = new LinearBVHNode[totalNodes];
@@ -99,15 +97,15 @@ namespace PBR {
 	BVHBuildNode* BVHAccel::recursiveBuild(
 		std::vector<BVHPrimitiveInfo>& primitiveInfo, int start, int end, int* totalNodes,
 		std::vector<std::shared_ptr<Primitive>>& orderedPrims) {
+		//递归调用的第一步：为当前子树创建临时根节点、节点总数递增、总包围盒
 		BVHBuildNode* node = new BVHBuildNode;
 		(*totalNodes)++;
-		// Compute bounds of all primitives in BVH node
 		Bounds3f bounds;
 		for (int i = start; i < end; ++i)
 			bounds = Union(bounds, primitiveInfo[i].bounds);
 		int nPrimitives = end - start;
-		if (nPrimitives == 1) {
-			// Create leaf _BVHBuildNode_
+		//图元数量为1：叶子节点
+		if (nPrimitives == 1) {		
 			int firstPrimOffset = orderedPrims.size();
 			for (int i = start; i < end; ++i) {
 				int primNum = primitiveInfo[i].primitiveNumber;
@@ -117,16 +115,13 @@ namespace PBR {
 			return node;
 		}
 		else {
-			// Compute bound of primitive centroids, choose split dimension _dim_
+			//所有图元中心点重合，无法继续分割：叶子节点
 			Bounds3f centroidBounds;
 			for (int i = start; i < end; ++i)
 				centroidBounds = Union(centroidBounds, primitiveInfo[i].centroid);
 			int dim = centroidBounds.MaximumExtent();
-
-			// Partition primitives into two sets and build children
 			int mid = (start + end) / 2;
 			if (centroidBounds.pMax[dim] == centroidBounds.pMin[dim]) {
-				// Create leaf _BVHBuildNode_
 				int firstPrimOffset = orderedPrims.size();
 				for (int i = start; i < end; ++i) {
 					int primNum = primitiveInfo[i].primitiveNumber;
@@ -136,10 +131,11 @@ namespace PBR {
 				return node;
 			}
 			else {
-				// Partition primitives based on _splitMethod_
+				// 选择分割策略
 				switch (splitMethod) {
 				case SplitMethod::Middle: {
-					// Partition primitives through node's midpoint
+					// 中点法：找到中心点包围盒 (centroidBounds) 在 dim 轴上的空间中点 pmid。
+					// 数组就地重排
 					float pmid =
 						(centroidBounds.pMin[dim] + centroidBounds.pMax[dim]) / 2;
 					BVHPrimitiveInfo* midPtr = std::partition(
@@ -148,14 +144,11 @@ namespace PBR {
 						return pi.centroid[dim] < pmid;
 					});
 					mid = midPtr - &primitiveInfo[0];
-					// For lots of prims with large overlapping bounding boxes, this
-					// may fail to partition; in that case don't break and fall
-					// through
-					// to EqualCounts.
+					// 所有图元都在中点同侧-落入均分法
 					if (mid != start && mid != end) break;
 				}
 				case SplitMethod::EqualCounts: {
-					// Partition primitives into equally-sized subsets
+					// 均分法：找到数量中点
 					mid = (start + end) / 2;
 					std::nth_element(&primitiveInfo[start], &primitiveInfo[mid],
 						&primitiveInfo[end - 1] + 1,
@@ -167,9 +160,9 @@ namespace PBR {
 				}
 				case SplitMethod::SAH:
 				default: {
-					// Partition primitives using approximate SAH
+					// 表面积启发法SAH
 					if (nPrimitives <= 2) {
-						// Partition primitives into equally-sized subsets
+						// 图元过少，退化为均分法
 						mid = (start + end) / 2;
 						std::nth_element(&primitiveInfo[start], &primitiveInfo[mid],
 							&primitiveInfo[end - 1] + 1,
@@ -180,11 +173,11 @@ namespace PBR {
 						});
 					}
 					else {
-						// Allocate _BucketInfo_ for SAH partition buckets
+						// 创建桶
 						constexpr int nBuckets = 12;
 						BucketInfo buckets[nBuckets];
 
-						// Initialize _BucketInfo_ for SAH partition buckets
+						// 遍历图元，根据相对位置放入桶中
 						for (int i = start; i < end; ++i) {
 							int b = nBuckets *
 								centroidBounds.Offset(
@@ -195,7 +188,8 @@ namespace PBR {
 								Union(buckets[b].bounds, primitiveInfo[i].bounds);
 						}
 
-						// Compute costs for splitting after each bucket
+						// 计算代价（1 是遍历内部节点的代价，
+						//count0 * b0.SurfaceArea() 是与左子节点求交的期望代价（代价正比于数量和表面积）。）
 						float cost[nBuckets - 1];
 						for (int i = 0; i < nBuckets - 1; ++i) {
 							Bounds3f b0, b1;
@@ -214,7 +208,7 @@ namespace PBR {
 								bounds.SurfaceArea();
 						}
 
-						// Find bucket to split at that minimizes SAH metric
+						// 找到最小代价对应的最佳分割
 						float minCost = cost[0];
 						int minCostSplitBucket = 0;
 						for (int i = 1; i < nBuckets - 1; ++i) {
@@ -224,8 +218,7 @@ namespace PBR {
 							}
 						}
 
-						// Either create leaf or split primitives at selected SAH
-						// bucket
+						// 执行分割，找出分割点
 						float leafCost = nPrimitives;
 						if (nPrimitives > maxPrimsInNode || minCost < leafCost) {
 							BVHPrimitiveInfo* pmid = std::partition(
@@ -239,7 +232,7 @@ namespace PBR {
 							mid = pmid - &primitiveInfo[0];
 						}
 						else {
-							// Create leaf _BVHBuildNode_
+							// SAH判定分割不划算
 							int firstPrimOffset = orderedPrims.size();
 							for (int i = start; i < end; ++i) {
 								int primNum = primitiveInfo[i].primitiveNumber;
@@ -253,6 +246,7 @@ namespace PBR {
 				}
 
 				}
+				//递归处理左半部分/右半部分
 				node->InitInterior(dim,
 					recursiveBuild(primitiveInfo, start, mid,
 						totalNodes, orderedPrims),
@@ -262,20 +256,26 @@ namespace PBR {
 		}
 		return node;
 	}
-
+	//深度优先：树的扁平化
+	//offset是一个全局偏移量
 	int BVHAccel::flattenBVHTree(BVHBuildNode* node, int* offset) {
 		LinearBVHNode* linearNode = &nodes[*offset];
 		linearNode->bounds = node->bounds;
+		//递增偏移量作为新的槽位
 		int myOffset = (*offset)++;
+		//递归中止
 		if (node->nPrimitives > 0) {
 			linearNode->primitivesOffset = node->firstPrimOffset;
 			linearNode->nPrimitives = node->nPrimitives;
 		}
 		else {
-			// Create interior flattened BVH node
+			// 复制分割轴
 			linearNode->axis = node->splitAxis;
 			linearNode->nPrimitives = 0;
+			//递归调用左子节点，会填充 myOffset + 1以及所有后续槽位。
 			flattenBVHTree(node->children[0], offset);
+			//递归调用右子节点。这个调用会返回右子节点被放置的起始索引
+			//并将其存储在当前节点的 secondChildOffset (第二个子节点偏移) 字段中。
 			linearNode->secondChildOffset =
 				flattenBVHTree(node->children[1], offset);
 		}
@@ -285,29 +285,29 @@ namespace PBR {
 	bool BVHAccel::Intersect(const Ray& ray, SurfaceInteraction* isect) const {
 		if (!nodes) return false;
 		bool hit = false;
-
+		// 预先计算除法
 		Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
 		int dirIsNeg[3] = { invDir.x < 0, invDir.y < 0, invDir.z < 0 };
-		// Follow ray through BVH nodes to find primitive intersections
+		// 栈，currentNodeIndex是正在处理的节点
 		int toVisitOffset = 0, currentNodeIndex = 0;
 		int nodesToVisit[64];
 		while (true) {
-
 			const LinearBVHNode* node = &nodes[currentNodeIndex];
-			// Check ray against BVH node
+			// 光线是否击中了包围盒？
 			if (node->bounds.IntersectP(ray, invDir, dirIsNeg)) {
+				//击中叶子节点
 				if (node->nPrimitives > 0) {
-
-					// Intersect ray with primitives in leaf BVH node
+					// 遍历图元，调用图元的相交函数
 					for (int i = 0; i < node->nPrimitives; ++i)
 						if (primitives[node->primitivesOffset + i]->Intersect(ray, isect))
 							hit = true;
+					// 弹出栈
 					if (toVisitOffset == 0) break;
 					currentNodeIndex = nodesToVisit[--toVisitOffset];
 				}
+				// 击中内部节点
 				else {
-					// Put far BVH node on _nodesToVisit_ stack, advance to near
-					// node
+					//先测试较近的子节点，较远 (Far) 的那个子节点压入 (Push) 栈中，后续处理
 					if (dirIsNeg[node->axis]) {
 						nodesToVisit[toVisitOffset++] = currentNodeIndex + 1;
 						currentNodeIndex = node->secondChildOffset;
@@ -318,6 +318,7 @@ namespace PBR {
 					}
 				}
 			}
+			//未击中，栈空遍历结束，栈不空弹出继续循环
 			else {
 				if (toVisitOffset == 0) break;
 				currentNodeIndex = nodesToVisit[--toVisitOffset];
@@ -335,7 +336,6 @@ namespace PBR {
 		while (true) {
 			const LinearBVHNode* node = &nodes[currentNodeIndex];
 			if (node->bounds.IntersectP(ray, invDir, dirIsNeg)) {
-				// Process BVH node _node_ for traversal
 				if (node->nPrimitives > 0) {
 					for (int i = 0; i < node->nPrimitives; ++i) {
 						if (primitives[node->primitivesOffset + i]->IntersectP(
@@ -348,7 +348,6 @@ namespace PBR {
 				}
 				else {
 					if (dirIsNeg[node->axis]) {
-						/// second child first
 						nodesToVisit[toVisitOffset++] = currentNodeIndex + 1;
 						currentNodeIndex = node->secondChildOffset;
 					}

@@ -6,6 +6,7 @@
 #include "Material\Material.h"
 
 namespace PBR {
+	//图元
 	class Primitive {
 	public:
 		virtual ~Primitive();
@@ -18,7 +19,7 @@ namespace PBR {
 			TransportMode mode,
 			bool allowMultipleLobes) const = 0;
 	};
-
+	//几何图元：形状、材质、面光源
 	class GeometricPrimitive : public Primitive {
 	public:
 		// GeometricPrimitive Public Methods
@@ -35,12 +36,12 @@ namespace PBR {
 			TransportMode mode,
 			bool allowMultipleLobes) const;
 	private:
-		// GeometricPrimitive Private Data
 		std::shared_ptr<Material> material;
 		std::shared_ptr<AreaLight> areaLight;
 		std::shared_ptr<Shape> shape;
 	};
 
+	//聚合图元，内部包含了其他图元，没有自己的材质或光源
 	class Aggregate : public Primitive {
 	public:
 		// Aggregate Public Methods

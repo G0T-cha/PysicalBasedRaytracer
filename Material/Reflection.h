@@ -15,7 +15,7 @@
 
 namespace PBR {
 
-    // BSDF Inline Functions
+    // 本地空间三角函数
     inline float CosTheta(const Vector3f& w) { return w.z; }
     inline float Cos2Theta(const Vector3f& w) { return w.z * w.z; }
     inline float AbsCosTheta(const Vector3f& w) { return std::abs(w.z); }
@@ -23,7 +23,6 @@ namespace PBR {
     inline float SinTheta(const Vector3f& w) { return std::sqrt(Sin2Theta(w)); }
     inline float TanTheta(const Vector3f& w) { return SinTheta(w) / CosTheta(w); }
     inline float Tan2Theta(const Vector3f& w) { return Sin2Theta(w) / Cos2Theta(w); }
-
     inline float CosPhi(const Vector3f& w) {
         float sinTheta = SinTheta(w);
         return (sinTheta == 0) ? 1 : Clamp(w.x / sinTheta, -1, 1);
@@ -32,10 +31,8 @@ namespace PBR {
         float sinTheta = SinTheta(w);
         return (sinTheta == 0) ? 0 : Clamp(w.y / sinTheta, -1, 1);
     }
-
     inline float Cos2Phi(const Vector3f& w) { return CosPhi(w) * CosPhi(w); }
     inline float Sin2Phi(const Vector3f& w) { return SinPhi(w) * SinPhi(w); }
-
     inline float CosDPhi(const Vector3f& wa, const Vector3f& wb) {
         float waxy = wa.x * wa.x + wa.y * wa.y;
         float wbxy = wb.x * wb.x + wb.y * wb.y;
@@ -43,27 +40,26 @@ namespace PBR {
             return 1;
         return Clamp((wa.x * wb.x + wa.y * wb.y) / std::sqrt(waxy * wbxy), -1, 1);
     }
-
+    // 反射公式：计算理想镜像反射向量
     inline Vector3f Reflect(const Vector3f& wo, const Vector3f& n) { return -wo + 2 * Dot(wo, n) * n; }
-
+    // 斯涅尔定律：根据入射向量、法线、折射率，计算理想折射向量
     inline bool Refract(const Vector3f& wi, const Normal3f& n, float eta,
         Vector3f* wt) {
-        // Compute $\cos \theta_\roman{t}$ using Snell's law
         float cosThetaI = Dot(n, wi);
         float sin2ThetaI = std::max(float(0), float(1 - cosThetaI * cosThetaI));
         float sin2ThetaT = eta * eta * sin2ThetaI;
-
-        // Handle total internal reflection for transmission
+        //全反射
         if (sin2ThetaT >= 1) return false;
         float cosThetaT = std::sqrt(1 - sin2ThetaT);
         *wt = eta * -wi + (eta * cosThetaI - cosThetaT) * Vector3f(n);
         return true;
     }
 
+    // 检查两个向量是否在法线同侧
     inline bool SameHemisphere(const Vector3f& w, const Vector3f& wp) { return w.z * wp.z > 0; }
-
     inline bool SameHemisphere(const Vector3f& w, const Normal3f& wp) { return w.z * wp.z > 0; }
 
+    // 位掩码，用于给积分器使用该枚举来查询 BSDF (双向散射分布函数)
     enum BxDFType {
         BSDF_REFLECTION = 1 << 0,
         BSDF_TRANSMISSION = 1 << 1,
@@ -74,40 +70,54 @@ namespace PBR {
         BSDF_TRANSMISSION,
     };
 
+    // 散射基类BxDF，所有具体的散射行为都将继承它，如漫反射、镜面反射等
     class BxDF {
     public:
-        // BxDF Interface
         virtual ~BxDF() {}
+        // 标记
         BxDF(BxDFType type) : type(type) {}
+        // 过滤器
         bool MatchesFlags(BxDFType t) const { return (type & t) == type; }
+        // 给定出射方向和入射方向，散射的能量（光谱）
         virtual Spectrum f(const Vector3f& wo, const Vector3f& wi) const = 0;
+        // 给定出射方向 wo（指向相机），和一个 2d 采样样本，根据物理特性，生成入射方向 wi
         virtual Spectrum Sample_f(const Vector3f& wo, Vector3f* wi,
             const Point2f& sample, float* pdf, BxDFType* sampledType = nullptr) const;
+        // 定向-半球反射率（俄罗斯轮盘赌）
+        // 光线从一个给定的出射方向 wo 观察，有多少能量是从整个半球的所有入射方向散射到 wo 方向的
         virtual Spectrum rho(const Vector3f& wo, int nSamples, const Point2f* samples) const;
+        // 双半球反射率
+        // 光线从所有可能的入射方向 wi 均匀射入，有多少能量被散射到了所有可能的出射方向 wo
         virtual Spectrum rho(int nSamples, const Point2f* samples1, const Point2f* samples2) const;
+        // 对于积分器持有的 wo，wi，Sample_f 本应采样到wi方向的概率密度
         virtual float Pdf(const Vector3f& wo, const Vector3f& wi) const;
 
-        // BxDF Public Data
+        // 成员：类型
         const BxDFType type;
     };
 
+    //将所有BxDF组合在一起
     class BSDF {
     public:
-        // BSDF Public Methods
+        //建立着色坐标系，将shading.n（ns）视为z轴，切线shading.dpdu（ss）视为x轴，
+        //ns, 副切线（ss）的叉乘作为y轴，另外存储几何法线ng，用于偏移和判断反射/投射
         BSDF(const SurfaceInteraction& si, float eta = 1)
             : eta(eta),
             ns(si.shading.n),
             ng(si.n),
             ss(Normalize(si.shading.dpdu)),
             ts(Cross(ns, ss)) {}
+        //注册BxDF
         void Add(BxDF* b) {
             //CHECK_LT(nBxDFs, MaxBxDFs);
             bxdfs[nBxDFs++] = b;
         }
         int NumComponents(BxDFType flags = BSDF_ALL) const;
+        //将世界空间向量v，转换为本地空间向量
         Vector3f WorldToLocal(const Vector3f& v) const {
             return Vector3f(Dot(v, ss), Dot(v, ts), Dot(v, ns));
         }
+        //逆向量
         Vector3f LocalToWorld(const Vector3f& v) const {
             return Vector3f(ss.x * v.x + ts.x * v.y + ns.x * v.z,
                 ss.y * v.x + ts.y * v.y + ns.y * v.z,
@@ -124,35 +134,30 @@ namespace PBR {
             BxDFType* sampledType = nullptr) const;
         float Pdf(const Vector3f& wo, const Vector3f& wi,
             BxDFType flags = BSDF_ALL) const;
-
-        // BSDF Public Data
         const float eta;
-        // BSDF Private Methods
         ~BSDF();
     private:
-        // BSDF Private Data
         const Normal3f ns, ng;
         const Vector3f ss, ts;
         int nBxDFs = 0;
         static constexpr int MaxBxDFs = 8;
         BxDF* bxdfs[MaxBxDFs];
     };
-
+    //兰伯特反射（理想漫反射）
     class LambertianReflection : public BxDF {
     public:
-        // LambertianReflection Public Methods
+        // 构造函数，把BxDFType设为反射、漫反射，同时接受一个光谱类型漫反射颜色
         LambertianReflection(const Spectrum& R)
             : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), R(R) {}
         Spectrum f(const Vector3f& wo, const Vector3f& wi) const;
+        // 两个反照率均为 R，反射比率固定
         Spectrum rho(const Vector3f&, int, const Point2f*) const { return R; }
         Spectrum rho(int, const Point2f*, const Point2f*) const { return R; }
     private:
-        // LambertianReflection Private Data
         const Spectrum R;
     };
 
 
-    // BSDF Inline Method Definitions
     inline int BSDF::NumComponents(BxDFType flags) const {
         int num = 0;
         for (int i = 0; i < nBxDFs; ++i)
@@ -162,21 +167,24 @@ namespace PBR {
 
     class SpecularReflection : public BxDF {
     public:
-        // SpecularReflection Public Methods
+        // 构造函数，把BxDFType设为反射、镜面反射，接受反射光谱R（镜面为111）
+        // 同时接受一个菲涅尔对象指针，负责根据入射角判断多少比例光被反射
         SpecularReflection(const Spectrum& R, Fresnel* fresnel)
             : BxDF(BxDFType(BSDF_REFLECTION | BSDF_SPECULAR)),
             R(R),
             fresnel(fresnel) {}
         ~SpecularReflection() { fresnel->~Fresnel(); }
+        // 给定出射方向和入射方向，散射的能量（光谱）永远为0
         virtual Spectrum f(const Vector3f& wo, const Vector3f& wi) const {
             return Spectrum(0.f);
         }
+        // 重写采样函数，用它生成采样光线
         virtual Spectrum Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& sample,
             float* pdf, BxDFType* sampledType) const;
+        // 概率密度同样为零
         float Pdf(const Vector3f& wo, const Vector3f& wi) const { return 0; }
 
     private:
-        // SpecularReflection Private Data
         const Spectrum R;
         const Fresnel* fresnel;
     };

@@ -6,7 +6,6 @@
 namespace PBR {
     static long long numLights = 0;
     static long long numAreaLights = 0;
-    // Light Method Definitions
     Light::Light(int flags, const Transform& LightToWorld, int nSamples)
         : flags(flags),
         nSamples(std::max(1, nSamples)),
@@ -17,6 +16,7 @@ namespace PBR {
 
 
     bool VisibilityTester::Unoccluded(const Scene& scene) const {
+        //测试两个交点有无遮挡
         return !scene.IntersectP(p0.SpawnRayTo(p1));
     }
 
