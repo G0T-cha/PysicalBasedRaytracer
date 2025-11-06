@@ -182,6 +182,77 @@ namespace PBR {
 		isect->n = isect->shading.n = Normal3f(Normalize(Cross(dp02, dp12)));
 		if (reverseOrientation ^ transformSwapsHandedness) 
 			isect->n = isect->shading.n = -isect->n;
+
+		// 仅当模型提供了逐顶点法线或逐顶点切线时
+		if (mesh->n || mesh->s) {
+			// 计算插值后的着色法线 ns
+			Normal3f ns;
+			if (mesh->n) {
+				// 平滑着色：利用重心坐标对顶点法线插值
+				ns = (b0 * mesh->n[v[0]] + b1 * mesh->n[v[1]] + b2 * mesh->n[v[2]]);
+				if (ns.LengthSquared() > 0)
+					ns = Normalize(ns);
+				else
+					ns = isect->n;
+			}
+			else
+				ns = isect->n;
+
+			// 计算插值后的着色切线 ss
+			Vector3f ss;
+			if (mesh->s) {
+				ss = (b0 * mesh->s[v[0]] + b1 * mesh->s[v[1]] + b2 * mesh->s[v[2]]);
+				if (ss.LengthSquared() > 0)
+					ss = Normalize(ss);
+				else
+					ss = Normalize(isect->dpdu);
+			}
+			else
+				ss = Normalize(isect->dpdu);
+
+			// 计算副切线 ts，并正交化
+			Vector3f ts = Cross(ss, ns);
+			if (ts.LengthSquared() > 0.f) {
+				ts = Normalize(ts);
+				ss = Cross(ts, ns);
+			}
+			else
+				CoordinateSystem((Vector3f)ns, &ss, &ts);
+
+			// 计算法线偏导数 dndu, dndv
+			Normal3f dndu, dndv;
+			if (mesh->n) {
+				Vector2f duv02 = uv[0] - uv[2];
+				Vector2f duv12 = uv[1] - uv[2];
+				Normal3f dn1 = mesh->n[v[0]] - mesh->n[v[2]];
+				Normal3f dn2 = mesh->n[v[1]] - mesh->n[v[2]];
+				float determinant = duv02[0] * duv12[1] - duv02[1] * duv12[0];
+				bool degenerateUV = std::abs(determinant) < 1e-8;
+				if (degenerateUV) {				
+					Vector3f dn = Cross(Vector3f(mesh->n[v[2]] - mesh->n[v[0]]),
+						Vector3f(mesh->n[v[1]] - mesh->n[v[0]]));
+					if (dn.LengthSquared() == 0)
+						dndu = dndv = Normal3f(0, 0, 0);
+					else {
+						Vector3f dnu, dnv;
+						CoordinateSystem(dn, &dnu, &dnv);
+						dndu = Normal3f(dnu);
+						dndv = Normal3f(dnv);
+					}
+				}
+				else {
+					float invDet = 1 / determinant;
+					dndu = (duv12[1] * dn1 - duv02[1] * dn2) * invDet;
+					dndv = (-duv12[0] * dn1 + duv02[0] * dn2) * invDet;
+				}
+			}
+			else
+				dndu = dndv = Normal3f(0, 0, 0);
+			if (reverseOrientation) ts = -ts;
+			// 保存结果
+			isect->SetShadingGeometry(ss, ts, dndu, dndv, true);
+		}
+
 		// 交点距离
 		*tHit = t;
 		++nHits;

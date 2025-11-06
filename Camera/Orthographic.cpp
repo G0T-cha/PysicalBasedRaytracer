@@ -9,7 +9,7 @@ namespace PBR {
 		
 		Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
 		Point3f pCamera = RasterToCamera(pFilm);
-		//光线不再全从原点出发
+		// 光线不再全从原点出发
 		*ray = Ray(pCamera, Vector3f(0, 0, 1));
 		
 		if (lensRadius > 0) {
@@ -19,11 +19,50 @@ namespace PBR {
 			ray->o = Point3f(pLens.x, pLens.y, 0);
 			ray->d = Normalize(pFocus - ray->o);
 		}
+		ray->medium = medium;
 		*ray = CameraToWorld(*ray);
 		return 1;
 	}
 
-	OrthographicCamera* CreateOrthographicCamera(const int RasterWidth, const int RasterHeight, const Transform& cam2world) {
+	float OrthographicCamera::GenerateRayDifferential(const CameraSample& sample, RayDifferential* ray) const {
+		// 主光线
+		Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
+		Point3f pCamera = RasterToCamera(pFilm);
+		*ray = RayDifferential(pCamera, Vector3f(0, 0, 1));
+
+		// 和上面普通光线一样
+		if (lensRadius > 0) {
+			Point2f pLens = lensRadius * ConcentricSampleDisk(sample.pLens);
+			float ft = focalDistance / ray->d.z;
+			Point3f pFocus = (*ray)(ft);
+			ray->o = Point3f(pLens.x, pLens.y, 0);
+			ray->d = Normalize(pFocus - ray->o);
+		}
+
+		// 启用景深
+		if (lensRadius > 0) {			
+			Point2f pLens = lensRadius * ConcentricSampleDisk(sample.pLens);
+			float ft = focalDistance / ray->d.z;
+			Point3f pFocus = pCamera + dxCamera + (ft * Vector3f(0, 0, 1));
+			ray->rxOrigin = Point3f(pLens.x, pLens.y, 0);
+			ray->rxDirection = Normalize(pFocus - ray->rxOrigin);
+			pFocus = pCamera + dyCamera + (ft * Vector3f(0, 0, 1));
+			ray->ryOrigin = Point3f(pLens.x, pLens.y, 0);
+			ray->ryDirection = Normalize(pFocus - ray->ryOrigin);
+		}
+
+		else {
+			ray->rxOrigin = ray->o + dxCamera;
+			ray->ryOrigin = ray->o + dyCamera;
+			ray->rxDirection = ray->ryDirection = ray->d;
+		}
+		ray->hasDifferentials = true;
+		ray->medium = medium;
+		*ray = CameraToWorld(*ray);
+		return 1;
+	}
+
+	OrthographicCamera* CreateOrthographicCamera(const int RasterWidth, const int RasterHeight, const Transform& cam2world, Medium* media) {
 
 		float frame = (float)RasterWidth / (float)RasterHeight;
 		Bounds2f screen;
@@ -55,7 +94,7 @@ namespace PBR {
 		float lensradius = 0.0f;
 		float focaldistance = 0.0f;
 		return new OrthographicCamera(RasterWidth, RasterHeight, cam2world, screen
-			, lensradius, focaldistance);
+			, lensradius, focaldistance, media);
 	}
 
 

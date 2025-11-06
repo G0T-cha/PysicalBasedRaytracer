@@ -15,6 +15,22 @@ namespace PBR{
 		float IntegratorRenderTime; //渲染一次用的时间
 	};
 
+	//积分：光源采样——均匀采样所有光源
+	Spectrum UniformSampleAllLights(const Interaction& it, const Scene& scene,
+		Sampler& sampler,
+		const std::vector<int>& nLightSamples,
+		bool handleMedia = false);
+	//积分：光源采样——均匀采样一个光源
+	Spectrum UniformSampleOneLight(const Interaction& it, const Scene& scene,
+		Sampler& sampler,
+		bool handleMedia = false,
+		const Distribution1D* lightDistrib = nullptr);
+	Spectrum EstimateDirect(const Interaction& it, const Point2f& uShading,
+		const Light& light, const Point2f& uLight,
+		const Scene& scene, Sampler& sampler,
+		bool handleMedia = false,
+		bool specular = false);
+
 	// 带采样的积分器，如大多基于蒙特卡洛的积分器
 	class SamplerIntegrator : public Integrator {
 	public:
@@ -26,13 +42,17 @@ namespace PBR{
 		virtual void Preprocess(const Scene& scene, Sampler& sampler) {}
 		// 渲染
 		void Render(const Scene& scene, double& timeConsume);
+
 		// 光照计算
-		virtual Spectrum Li(const Ray& ray, const Scene& scene, Sampler& sampler, int depth = 0) const = 0;
+		virtual Spectrum Li(const RayDifferential& ray, const Scene& scene, Sampler& sampler, int depth = 0) const;
 		// 处理理想镜面反射
-		Spectrum SpecularReflect(const Ray& ray,
+		Spectrum SpecularReflect(const RayDifferential& ray,
 			const SurfaceInteraction& isect,
 			const Scene& scene, Sampler& sampler,
 			int depth) const;
+		Spectrum SpecularTransmit(const RayDifferential& ray,
+			const SurfaceInteraction& isect,
+			const Scene& scene, Sampler& sampler, int depth) const;
 	protected:
 		std::shared_ptr<const Camera> camera;
 
@@ -41,6 +61,8 @@ namespace PBR{
 		const Bounds2i pixelBounds;
 		FrameBuffer* m_FrameBuffer;
 	};
+
+
 }
 
 

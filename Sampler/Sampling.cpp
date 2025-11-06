@@ -118,6 +118,20 @@ namespace PBR {
 		return Point2f(1 - su0, u[1] * su0);
 	}
 
+	Distribution2D::Distribution2D(const float* func, int nu, int nv) {
+		pConditionalV.reserve(nv);
+		for (int v = 0; v < nv; ++v) {
+			// 构造条件分布
+			pConditionalV.emplace_back(new Distribution1D(&func[v * nu], nu));
+		}
+		// 构建边缘分布
+		std::vector<float> marginalFunc;
+		marginalFunc.reserve(nv);
+		for (int v = 0; v < nv; ++v)
+			marginalFunc.push_back(pConditionalV[v]->funcInt);
+		pMarginal.reset(new Distribution1D(&marginalFunc[0], nv));
+	}
+
 
 
 

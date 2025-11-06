@@ -1,7 +1,9 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\Material",
+    "\\Texture"
   ],
-  "SelectedNode": "\\Integrator",
+  "SelectedNode": "\\Texture\\MIPMap.h",
   "PreviewInSolutionExplorer": false
 }

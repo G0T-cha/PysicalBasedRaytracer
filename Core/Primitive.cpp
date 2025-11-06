@@ -9,8 +9,8 @@ namespace PBR {
 
 	Primitive::~Primitive() {}
 	GeometricPrimitive::GeometricPrimitive(const std::shared_ptr<Shape>& shape,
-		const std::shared_ptr<Material>& material, const std::shared_ptr<AreaLight>& areaLight)
-		: shape(shape), material(material), areaLight(areaLight){
+		const std::shared_ptr<Material>& material, const std::shared_ptr<AreaLight>& areaLight, const MediumInterface& mediumInterface)
+		: shape(shape), material(material), areaLight(areaLight), mediumInterface(mediumInterface) {
 		primitiveMemory += sizeof(*this);
 	}
 	//委托给形状类
@@ -29,6 +29,10 @@ namespace PBR {
 		//CHECK_GE(Dot(isect->n, isect->shading.n), 0.);
 		// Initialize _SurfaceInteraction::mediumInterface_ after _Shape_
 		// intersection
+		if (mediumInterface.IsMediumTransition())
+			isect->mediumInterface = mediumInterface;
+		else
+			isect->mediumInterface = MediumInterface(r.medium);
 		return true;
 	}
 	//委托给材质

@@ -22,8 +22,8 @@ namespace PBR {
             //为交点添加漫反射BxDF模型
             if (sig == 0)
                 si->bsdf->Add(new LambertianReflection(r));
-            //else
-                //si->bsdf->Add(ARENA_ALLOC(arena, OrenNayar)(r, sig));
+            else
+                si->bsdf->Add(new OrenNayar(r, sig));
         }
     }
 

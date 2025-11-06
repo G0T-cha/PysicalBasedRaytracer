@@ -10,7 +10,7 @@ class SkyBoxLight : public Light {
 	  // 天空盒：无穷远光源
 	  // 初始化：世界中心，世界半径
 	SkyBoxLight(const Transform &LightToWorld, const Point3f& worldCenter, float worldRadius, const char * file,  int nSamples)
-	: Light((int)LightFlags::Infinite, LightToWorld, nSamples),
+	: Light((int)LightFlags::Infinite, LightToWorld, MediumInterface(), nSamples),
 		worldCenter(worldCenter),
 		worldRadius(worldRadius)
 	{
@@ -28,7 +28,7 @@ class SkyBoxLight : public Light {
 	Spectrum getLightValue(float u, float v) const;
     Spectrum Power() const { return Spectrum(0.f); }
 	// 查询自发光
-	Spectrum Le(const Ray &ray) const;
+	Spectrum Le(const RayDifferential&ray) const;
 	// 光源采样
 	Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wi,
 		float *pdf, VisibilityTester *vis) const;

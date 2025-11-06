@@ -46,7 +46,7 @@ Spectrum SkyBoxLight::Sample_Li(const Interaction& ref, const Point2f& u, Vector
 	*wi = UniformSampleSphere(u);
 	*pdf = 1.f / (4 * Pi);
 	// 3. 设置可见性
-	*vis = VisibilityTester(ref, Interaction(ref.p + *wi * (2 * worldRadius), ref.time));
+	*vis = VisibilityTester(ref, Interaction(ref.p + *wi * (2 * worldRadius), ref.time, mediumInterface));
 	// 4. 将新生成的方向 *wi* 转换回 (u,v) 坐标
 	float u_lookup, v_lookup;
 	get_sphere_uv(Normalize(*wi), u_lookup, v_lookup);
@@ -56,7 +56,7 @@ Spectrum SkyBoxLight::Sample_Li(const Interaction& ref, const Point2f& u, Vector
 }
 
 //查询自发光
-Spectrum SkyBoxLight::Le(const Ray& ray) const {
+Spectrum SkyBoxLight::Le(const RayDifferential& ray) const {
 	// 1. 无限光源只关心“方向”
 	Vector3f dir_normalized = Normalize(ray.d);
 	// 2. 将这个方向转换为 (u,v) 坐标
@@ -69,9 +69,9 @@ Spectrum SkyBoxLight::Le(const Ray& ray) const {
 	}
 	else {
 		// 4. 如果没有 HDR 数据，使用方向->颜色的测试逻辑
-		Col[0] = (dir_normalized.x + 1.f) * 0.5f;
-		Col[1] = (dir_normalized.y + 1.f) * 0.5f;
-		Col[2] = (dir_normalized.z + 1.f) * 0.5f;
+		Col[0] = 0.0f;
+		Col[1] = 0.0f;
+		Col[2] = 0.0f;
 	}
 	return Col;
 }

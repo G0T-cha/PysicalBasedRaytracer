@@ -8,7 +8,7 @@
 
 
 namespace PBR {
-Spectrum WhittedIntegrator::Li(const Ray &ray, const Scene &scene,
+Spectrum WhittedIntegrator::Li(const RayDifferential&ray, const Scene &scene,
                                Sampler &sampler, int depth) const {
     Spectrum L(0.);
     // 查找光线与场景的最近交点

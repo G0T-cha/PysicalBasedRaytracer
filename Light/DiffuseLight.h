@@ -10,7 +10,7 @@ namespace PBR {
 	public:
 		// Le是单位面积单位立体角的能量强度（Radiance）
 		// shape为形状，twoSided为是否两面发光
-		DiffuseAreaLight(const Transform& LightToWorld, const Spectrum& Le,
+		DiffuseAreaLight(const Transform& LightToWorld, const MediumInterface& mediumInterface, const Spectrum& Le,
 			int nSamples, const std::shared_ptr<Shape>& shape,
 			bool twoSided = false);
 		// 自发光辐照度：正面看为Lemit

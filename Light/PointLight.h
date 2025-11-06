@@ -10,8 +10,8 @@ namespace PBR {
 	class PointLight : public Light {
 	public:
 		// 点光源本地0，0，0，通过变换转换为世界坐标
-		PointLight(const Transform& LightToWorld, const Spectrum& I)
-			: Light((int)LightFlags::DeltaPosition, LightToWorld),
+		PointLight(const Transform& LightToWorld, const MediumInterface& mediumInterface, const Spectrum& I)
+			: Light((int)LightFlags::DeltaPosition, LightToWorld, mediumInterface),
 			pLight(LightToWorld(Point3f(0, 0, 0))),
 			I(I) {}
 		// 执行光源采样

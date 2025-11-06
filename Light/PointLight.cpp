@@ -9,7 +9,7 @@ namespace PBR {
 		*wi = Normalize(pLight - ref.p);
 		*pdf = 1.f;
 		*vis =
-			VisibilityTester(ref, Interaction(pLight, ref.time));
+			VisibilityTester(ref, Interaction(pLight, ref.time, mediumInterface));
 		// 返回平方反比的光照强度衰减
 		return I / DistanceSquared(pLight, ref.p);
 	}

@@ -4,6 +4,7 @@
 
 #include "Core\Geometry.h"
 #include "Material\Material.h"
+#include "Media\Medium.h"
 
 namespace PBR {
 	//图元
@@ -28,7 +29,8 @@ namespace PBR {
 		virtual bool IntersectP(const Ray& r) const;
 		GeometricPrimitive(const std::shared_ptr<Shape>& shape,
 			const std::shared_ptr<Material>& material,
-			const std::shared_ptr<AreaLight>& areaLight);
+			const std::shared_ptr<AreaLight>& areaLight,
+			const MediumInterface& mediumInterface);
 
 		const AreaLight* GetAreaLight() const;
 		const Material* GetMaterial() const;
@@ -39,6 +41,7 @@ namespace PBR {
 		std::shared_ptr<Material> material;
 		std::shared_ptr<AreaLight> areaLight;
 		std::shared_ptr<Shape> shape;
+		MediumInterface mediumInterface;
 	};
 
 	//聚合图元，内部包含了其他图元，没有自己的材质或光源

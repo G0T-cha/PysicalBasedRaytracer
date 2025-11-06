@@ -777,6 +777,16 @@ namespace PBR
 	}
 
 	template <typename T>
+	inline void CoordinateSystem(const Vector3<T>& v1, Vector3<T>* v2,
+		Vector3<T>* v3) {
+		if (std::abs(v1.x) > std::abs(v1.y))
+			*v2 = Vector3<T>(-v1.z, 0, v1.x) / std::sqrt(v1.x * v1.x + v1.z * v1.z);
+		else
+			*v2 = Vector3<T>(0, v1.z, -v1.y) / std::sqrt(v1.y * v1.y + v1.z * v1.z);
+		*v3 = Cross(v1, *v2);
+	}
+
+	template <typename T>
 	Vector2<T>::Vector2(const Point2<T>& p)
 		: x(p.x), y(p.y)
 	{
@@ -1353,8 +1363,8 @@ namespace PBR
 		// Ray Public Methods
 		Ray() : tMax(Infinity), time(0.f) {}
 		Ray(const Point3f& o, const Vector3f& d, float tMax = Infinity,
-			float time = 0.f)
-			: o(o), d(d), tMax(tMax), time(time) {}
+			float time = 0.f, const Medium* medium = nullptr)
+			: o(o), d(d), tMax(tMax), time(time), medium(medium) {}
 		Point3f operator()(float t) const { return o + d * t; }
 		bool HasNaNs() const { return (o.HasNaNs() || d.HasNaNs() || isNaN(tMax)); }
 		// Ray Public Data
@@ -1362,6 +1372,36 @@ namespace PBR
 		Vector3f d;
 		mutable float tMax;
 		float time;
+		const Medium* medium;
+	};
+
+	class RayDifferential : public Ray {
+	public:
+		// 默认是普通光线
+		RayDifferential() { hasDifferentials = false; }
+		RayDifferential(const Point3f& o, const Vector3f& d, float tMax = Infinity,
+			float time = 0.f)
+			: Ray(o, d, tMax, time) {
+			hasDifferentials = false;
+		}
+		RayDifferential(const Ray& ray) : Ray(ray) { hasDifferentials = false; }
+		bool HasNaNs() const {
+			return Ray::HasNaNs() ||
+				(hasDifferentials &&
+					(rxOrigin.HasNaNs() || ryOrigin.HasNaNs() ||
+						rxDirection.HasNaNs() || ryDirection.HasNaNs()));
+		}
+		// 缩放微分幅度
+		void ScaleDifferentials(float s) {
+			rxOrigin = o + (rxOrigin - o) * s;
+			ryOrigin = o + (ryOrigin - o) * s;
+			rxDirection = d + (rxDirection - d) * s;
+			ryDirection = d + (ryDirection - d) * s;
+		}
+		// 微分光线
+		bool hasDifferentials;
+		Point3f rxOrigin, ryOrigin;
+		Vector3f rxDirection, ryDirection;
 	};
 
 	template <typename T>
@@ -1460,6 +1500,27 @@ namespace PBR
 		}
 		else
 			return false;
+	}
+
+	inline Vector3f SphericalDirection(float sinTheta, float cosTheta, float phi) {
+		return Vector3f(sinTheta * std::cos(phi), sinTheta * std::sin(phi),
+			cosTheta);
+	}
+
+	inline Vector3f SphericalDirection(float sinTheta, float cosTheta, float phi,
+		const Vector3f& x, const Vector3f& y,
+		const Vector3f& z) {
+		return sinTheta * std::cos(phi) * x + sinTheta * std::sin(phi) * y +
+			cosTheta * z;
+	}
+
+	inline float SphericalTheta(const Vector3f& v) {
+		return std::acos(Clamp(v.z, -1, 1));
+	}
+
+	inline float SphericalPhi(const Vector3f& v) {
+		float p = std::atan2(v.y, v.x);
+		return (p < 0) ? (p + 2 * Pi) : p;
 	}
 }
 

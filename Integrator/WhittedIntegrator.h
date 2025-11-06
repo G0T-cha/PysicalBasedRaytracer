@@ -12,7 +12,7 @@ class WhittedIntegrator : public SamplerIntegrator {
                       const Bounds2i &pixelBounds, FrameBuffer * m_FrameBuffer)
         : SamplerIntegrator(camera, sampler, pixelBounds, m_FrameBuffer), maxDepth(maxDepth) {}
     // 重写光线计算函数
-    Spectrum Li(const Ray &ray, const Scene &scene,
+    Spectrum Li(const RayDifferential&ray, const Scene &scene,
                 Sampler &sampler, int depth) const;
   private:
     const int maxDepth;

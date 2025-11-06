@@ -20,7 +20,7 @@ public:
     //核心方法
 	bool Unoccluded(const Scene& scene) const;
     //计算透射率，用于体积渲染
-	Spectrum Tr(const Scene& scene, Sampler& sampler) const { return Spectrum(0.f); }
+	Spectrum Tr(const Scene& scene, Sampler& sampler) const; 
 
 private:
 	Interaction p0, p1;
@@ -44,7 +44,7 @@ class Light {
 public:
     virtual ~Light() {}
     // 光源类型、光源空间到世界空间、采样数
-    Light(int flags, const Transform& LightToWorld, int nSamples = 1);
+    Light(int flags, const Transform& LightToWorld, const MediumInterface& mediumInterface, int nSamples = 1);
     // 执行光源采样
     // 给定被着色点ref和2d采样样本u，生成入射光方向wi、立体角pdf和可见性测试器vis，返回光谱：该方向的入射辐照度Li
     virtual Spectrum Sample_Li(const Interaction& ref, const Point2f& u,
@@ -55,7 +55,7 @@ public:
     // 可选预处理
     virtual void Preprocess(const Scene& scene) {}
     // 查询自发光，光线未击中任何物体或者击中了光源，返回自发光
-    virtual Spectrum Le(const Ray& r) const { return Spectrum(0.8f); }
+    virtual Spectrum Le(const RayDifferential& r) const { return Spectrum(0.8f); }
     // 查询光源采样PDF，用于MIS
     // 给定 ref 和 wi，返回 Sample_Li 本应采样到 wi 的 pdf
     virtual float Pdf_Li(const Interaction& ref, const Vector3f& wi) const = 0;
@@ -72,7 +72,9 @@ public:
 
 
     const int flags;
+    // 采样数：对光源采样时需要，如直接光照积分器
     const int nSamples;
+    const MediumInterface mediumInterface;
 protected:
     const Transform LightToWorld, WorldToLight;
 };
@@ -80,7 +82,7 @@ protected:
 // 子类：有表面积的光源
 class AreaLight : public Light {
 public:
-    AreaLight(const Transform& LightToWorld, int nSamples);
+    AreaLight(const Transform& LightToWorld, const MediumInterface& medium, int nSamples);
     // 查询面光源辐照度，返回光谱
     virtual Spectrum L(const Interaction& intr, const Vector3f& w) const = 0;
 };

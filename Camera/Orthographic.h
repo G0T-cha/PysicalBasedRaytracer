@@ -10,9 +10,16 @@ namespace PBR {
         // 将上一步得到的 [0, zFar - zNear] 范围归一化到 [0, 1] 的标准范围。
         OrthographicCamera(const int RasterWidth, const int RasterHeight, const Transform& CameraToWorld,
             const Bounds2f& screenWindow, float lensRadius,
-            float focalDistance)
-            : ProjectiveCamera(RasterWidth, RasterHeight, CameraToWorld, Orthographic(0, 10), screenWindow, lensRadius, focalDistance) {
+            float focalDistance, const Medium* medium)
+            : ProjectiveCamera(RasterWidth, RasterHeight, CameraToWorld, Orthographic(0, 10), screenWindow, lensRadius, focalDistance, medium) {
+            dxCamera = RasterToCamera(Vector3f(1, 0, 0));
+            dyCamera = RasterToCamera(Vector3f(0, 1, 0));
         }
         float GenerateRay(const CameraSample& sample, Ray*) const;
+        float GenerateRayDifferential(const CameraSample& sample,
+            RayDifferential*) const;
+    private:
+        // OrthographicCamera Private Data
+        Vector3f dxCamera, dyCamera;
     };
 }

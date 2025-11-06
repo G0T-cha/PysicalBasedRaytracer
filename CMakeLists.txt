@@ -4,6 +4,8 @@ set(CMAKE_CXX_STANDARD 11)
 
 project(PBR)
 
+find_package(assimp CONFIG REQUIRED)
+
 find_package(OpenMP REQUIRED)
 
 set(CMAKE_BUILD_TYPE  "Release")
@@ -46,6 +48,7 @@ set(Core
 	Core/Spectrum.cpp
 	Core/Scene.h
 	Core/Scene.cpp
+	Core/Memory.h
 )
 # Make the Core group
 SOURCE_GROUP("Core" FILES ${Core})
@@ -66,6 +69,8 @@ set(Shape
 	Shape/Sphere.cpp
 	Shape/Triangle.h
 	Shape/Triangle.cpp
+	Shape/ModelLoad.h
+	Shape/ModelLoad.cpp
 )
 # Make the Shape group
 SOURCE_GROUP("Shape" FILES ${Shape})
@@ -106,6 +111,12 @@ set(Integrator
 	Integrator/Integrator.cpp
 	Integrator/WhittedIntegrator.cpp
 	Integrator/WhittedIntegrator.h
+	Integrator/DirectLightingIntegrator.h
+	Integrator/DirectLightingIntegrator.cpp
+	Integrator/PathIntegrator.h
+	Integrator/PathIntegrator.cpp
+	Integrator/VolPathIntegrator.h
+	Integrator/VolPathIntegrator.cpp
 )
 # Make the Integrator group
 SOURCE_GROUP("Integrator" FILES ${Integrator})
@@ -114,6 +125,8 @@ SOURCE_GROUP("Integrator" FILES ${Integrator})
 set(Material
 	Material/Reflection.h
 	Material/Reflection.cpp
+	Material/Microfacet.h
+	Material/Microfacet.cpp
 	Material/Material.h
 	Material/Material.cpp
 	Material/MatteMaterial.h
@@ -122,6 +135,12 @@ set(Material
 	Material/Fresnel.cpp
 	Material/Mirror.h
 	Material/Mirror.cpp
+	Material/PlasticMaterial.h
+	Material/PlasticMaterial.cpp
+	Material/MetalMaterial.h
+	Material/MetalMaterial.cpp
+	Material/GlassMaterial.h
+	Material/GlassMaterial.cpp
 )
 # Make the Material group
 SOURCE_GROUP("Material" FILES ${Material})
@@ -131,6 +150,10 @@ set(Texture
 	Texture/Texture.cpp
 	Texture/ConstantTexture.h
 	Texture/ConstantTexture.cpp
+	Texture/MIPMap.h
+	Texture/MIPMap.cpp
+	Texture/ImageTexture.h
+	Texture/ImageTexture.cpp
 )
 # Make the Texture group
 SOURCE_GROUP("Texture" FILES ${Texture})
@@ -145,9 +168,25 @@ set(Light
 	Light/DiffuseLight.cpp
 	Light/SkyBoxLight.h
 	Light/SkyBoxLight.cpp
+	Light/LightDistrib.h
+	Light/LightDistrib.cpp
+	Light/InfiniteAreaLight.h
+	Light/InfiniteAreaLight.cpp
 )
 # Make the Light group
 SOURCE_GROUP("Light" FILES ${Light})
+
+# Media files
+set(Media
+	Media/Medium.h
+	Media/Medium.cpp
+	Media/HomogeneousMedium.h
+	Media/HomogeneousMedium.cpp
+	Media/GridDensityMedium.h
+	Media/GridDensityMedium.cpp
+)
+# Make the Media group
+SOURCE_GROUP("Media" FILES ${Media})
 
 # Create executable
 add_executable(PBR
@@ -161,9 +200,12 @@ add_executable(PBR
 	${Material}
 	${Texture}
 	${Light}
+	${Media}
  )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PBR)
 

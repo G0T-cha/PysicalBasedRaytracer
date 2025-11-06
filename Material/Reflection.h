@@ -8,6 +8,7 @@
 #include "Core\Interaction.h"
 
 #include "Material\Fresnel.h"
+#include "Material\Microfacet.h"
 
 #include <algorithm>
 #include <string>
@@ -110,7 +111,9 @@ namespace PBR {
         //注册BxDF
         void Add(BxDF* b) {
             //CHECK_LT(nBxDFs, MaxBxDFs);
-            bxdfs[nBxDFs++] = b;
+            //bxdfs[nBxDFs++] = b;
+            bxdfs.push_back(std::shared_ptr<BxDF>(b));
+            nBxDFs++;
         }
         int NumComponents(BxDFType flags = BSDF_ALL) const;
         //将世界空间向量v，转换为本地空间向量
@@ -141,8 +144,10 @@ namespace PBR {
         const Vector3f ss, ts;
         int nBxDFs = 0;
         static constexpr int MaxBxDFs = 8;
-        BxDF* bxdfs[MaxBxDFs];
+        std::vector<std::shared_ptr<BxDF>> bxdfs;
+        //BxDF* bxdfs[MaxBxDFs];
     };
+
     //兰伯特反射（理想漫反射）
     class LambertianReflection : public BxDF {
     public:
@@ -157,6 +162,23 @@ namespace PBR {
         const Spectrum R;
     };
 
+    // 奥伦纳亚尔模型（粗糙漫反射）
+    // 在掠射角度或者当光源和观察者的方向比较接近时，会显得更亮
+    class OrenNayar : public BxDF {
+    public:
+        Spectrum f(const Vector3f& wo, const Vector3f& wi) const;
+        OrenNayar(const Spectrum& R, float sigma)
+            : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), R(R) {
+            sigma = Radians(sigma);
+            float sigma2 = sigma * sigma;
+            A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
+            B = 0.45f * sigma2 / (sigma2 + 0.09f);
+        }
+    private:
+        const Spectrum R;
+        float A, B;
+    };
+
 
     inline int BSDF::NumComponents(BxDFType flags) const {
         int num = 0;
@@ -165,6 +187,7 @@ namespace PBR {
         return num;
     }
 
+    // 光滑镜面
     class SpecularReflection : public BxDF {
     public:
         // 构造函数，把BxDFType设为反射、镜面反射，接受反射光谱R（镜面为111）
@@ -187,6 +210,129 @@ namespace PBR {
     private:
         const Spectrum R;
         const Fresnel* fresnel;
+    };
+
+    // 清水/玻璃（完美透射）
+    class SpecularTransmission : public BxDF {
+    public:
+        SpecularTransmission(const Spectrum& T, float etaA, float etaB,
+            TransportMode mode)
+            : BxDF(BxDFType(BSDF_TRANSMISSION | BSDF_SPECULAR)),
+            T(T),
+            etaA(etaA),
+            etaB(etaB),
+            fresnel(etaA, etaB),
+            mode(mode) {}
+        Spectrum f(const Vector3f& wo, const Vector3f& wi) const {
+            return Spectrum(0.f);
+        }
+        Spectrum Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& sample,
+            float* pdf, BxDFType* sampledType) const;
+        float Pdf(const Vector3f& wo, const Vector3f& wi) const { return 0; }
+
+    private:
+        const Spectrum T;
+        const float etaA, etaB;
+        const FresnelDielectric fresnel;
+
+        const TransportMode mode;
+    };
+
+    // 完美玻璃（完美反射+完美透射）
+    class FresnelSpecular : public BxDF {
+    public:
+        FresnelSpecular(const Spectrum& R, const Spectrum& T, float etaA, float etaB, TransportMode mode)
+            : BxDF(BxDFType(BSDF_REFLECTION | BSDF_TRANSMISSION | BSDF_SPECULAR)),
+            R(R),
+            T(T),
+            etaA(etaA),
+            etaB(etaB),
+            mode(mode) {}
+        Spectrum f(const Vector3f& wo, const Vector3f& wi) const {
+            return Spectrum(0.f);
+        }
+        // 根据样本执行透射/反射
+        Spectrum Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& u,
+            float* pdf, BxDFType* sampledType) const;
+        float Pdf(const Vector3f& wo, const Vector3f& wi) const { return 0; }
+
+    private:
+        const Spectrum R, T;
+        const float etaA, etaB;
+        const TransportMode mode;
+    };
+
+    // 金属（微表面反射）
+    class MicrofacetReflection : public BxDF {
+    public:
+        //接受GGX模型，决定高光形状D和自阴影G
+        MicrofacetReflection(const Spectrum& R,
+            MicrofacetDistribution* distribution, Fresnel* fresnel)
+            : BxDF(BxDFType(BSDF_REFLECTION | BSDF_GLOSSY)),
+            R(R),
+            distribution(distribution),
+            fresnel(fresnel) {}
+        ~MicrofacetReflection() {}
+        Spectrum f(const Vector3f& wo, const Vector3f& wi) const;
+        Spectrum Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& u,
+            float* pdf, BxDFType* sampledType) const;
+        float Pdf(const Vector3f& wo, const Vector3f& wi) const;
+    private:
+        // MicrofacetReflection Private Data
+        const Spectrum R;
+        const std::shared_ptr<MicrofacetDistribution> distribution;
+        const std::shared_ptr<Fresnel> fresnel;
+    };
+
+    // 磨砂玻璃（微表面透射）
+    class MicrofacetTransmission : public BxDF {
+    public:
+        MicrofacetTransmission(const Spectrum& T,
+            MicrofacetDistribution* distribution, float etaA,
+            float etaB, TransportMode mode)
+            : BxDF(BxDFType(BSDF_TRANSMISSION | BSDF_GLOSSY)),
+            T(T),
+            distribution(distribution),
+            etaA(etaA),
+            etaB(etaB),
+            fresnel(etaA, etaB),
+            mode(mode) {}
+        ~MicrofacetTransmission() {}
+        Spectrum f(const Vector3f& wo, const Vector3f& wi) const;
+        Spectrum Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& u,
+            float* pdf, BxDFType* sampledType) const;
+        float Pdf(const Vector3f& wo, const Vector3f& wi) const;
+
+    private:
+        const Spectrum T;
+        const std::shared_ptr<MicrofacetDistribution> distribution;
+        const float etaA, etaB;
+        // 电介质菲涅尔
+        const FresnelDielectric fresnel;
+        const TransportMode mode;
+    };
+
+    //塑料、清漆（哑光+光泽）
+    class FresnelBlend : public BxDF {
+    public:
+        // GGX：清漆的粗糙度
+        FresnelBlend(const Spectrum& Rd, const Spectrum& Rs,
+            MicrofacetDistribution* distrib);
+        ~FresnelBlend() {}
+        Spectrum f(const Vector3f& wo, const Vector3f& wi) const;
+        // 施利克近似：返回在特定角度下光线被反射的百分比
+        Spectrum SchlickFresnel(float cosTheta) const {
+            auto pow5 = [](float v) { return (v * v) * (v * v) * v; };
+            return Rs + pow5(1 - cosTheta) * (Spectrum(1.) - Rs);
+        }
+        Spectrum Sample_f(const Vector3f& wi, Vector3f* sampled_f, const Point2f& u,
+            float* pdf, BxDFType* sampledType) const;
+        float Pdf(const Vector3f& wo, const Vector3f& wi) const;
+
+    private:
+        // 漫反射颜色、镜面颜色
+        const Spectrum Rd, Rs;
+        std::shared_ptr<MicrofacetDistribution> distribution;
     };
 }
 

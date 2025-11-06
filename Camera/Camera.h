@@ -20,20 +20,21 @@ namespace PBR {
 
 	class Camera {
 	public:
-		Camera(const Transform& CameraToWorld) :CameraToWorld(CameraToWorld) {}
+		Camera(const Transform& CameraToWorld, const Medium* medium = nullptr) :CameraToWorld(CameraToWorld), medium(medium) {}
 		virtual ~Camera() {}
 		virtual float GenerateRay(const CameraSample& sample, Ray* ray) const { return 1; };
-
+		virtual float GenerateRayDifferential(const CameraSample& sample, RayDifferential* rd) const;
 		// 相机空间到世界空间
 		Transform CameraToWorld;
+		const Medium* medium;
 	};
 
 	class ProjectiveCamera : public Camera {
 	public:
 		ProjectiveCamera(const int RasterWidth, const int RasterHeight, const Transform& CameraToWorld,
 			const Transform& CameraToScreen,
-			const Bounds2f& screenWindow, float lensr, float focald)
-			: Camera(CameraToWorld),
+			const Bounds2f& screenWindow, float lensr, float focald, const Medium* medium)
+			: Camera(CameraToWorld, medium),
 			CameraToScreen(CameraToScreen) {
 			// 景深
 			lensRadius = lensr;

@@ -119,7 +119,7 @@ namespace PBR{
 		int comp =
 			std::min((int)std::floor(u[0] * matchingComps), matchingComps - 1);
 		// 获取其指针
-		BxDF* bxdf = nullptr;
+		std::shared_ptr<BxDF>bxdf = nullptr;
 		int count = comp;
 		for (int i = 0; i < nBxDFs; ++i)
 			if (bxdfs[i]->MatchesFlags(type) && count-- == 0) {
@@ -164,13 +164,38 @@ namespace PBR{
 	}
 
 	BSDF::~BSDF() {
-		for (int i = 0; i < nBxDFs; i++)
-			bxdfs[i]->~BxDF();
 	}
+
 	// 给定出射方向和入射方向，散射的能量（光谱）
-	// 漫反射为 R / PI
+	// 理想漫反射为 R / PI
 	Spectrum LambertianReflection::f(const Vector3f& wo, const Vector3f& wi) const {
 		return R * InvPi;
+	}
+
+	// 粗糙漫反射，依赖粗糙度
+	Spectrum OrenNayar::f(const Vector3f& wo, const Vector3f& wi) const {
+		float sinThetaI = SinTheta(wi);
+		float sinThetaO = SinTheta(wo);
+		// Compute cosine term of Oren-Nayar model
+		float maxCos = 0;
+		if (sinThetaI > 1e-4 && sinThetaO > 1e-4) {
+			float sinPhiI = SinPhi(wi), cosPhiI = CosPhi(wi);
+			float sinPhiO = SinPhi(wo), cosPhiO = CosPhi(wo);
+			float dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+			maxCos = std::max((float)0, dCos);
+		}
+
+		// Compute sine and tangent terms of Oren-Nayar model
+		float sinAlpha, tanBeta;
+		if (AbsCosTheta(wi) > AbsCosTheta(wo)) {
+			sinAlpha = sinThetaO;
+			tanBeta = sinThetaI / AbsCosTheta(wi);
+		}
+		else {
+			sinAlpha = sinThetaI;
+			tanBeta = sinThetaO / AbsCosTheta(wo);
+		}
+		return R * InvPi * (A + B * maxCos * sinAlpha * tanBeta);
 	}
 
 	// 给定出射方向 wo（指向相机），和一个 2d 采样样本，根据物理特性，生成入射方向 wi
@@ -181,5 +206,193 @@ namespace PBR{
 		*wi = Vector3f(-wo.x, -wo.y, wo.z);
 		*pdf = 1;
 		return fresnel->Evaluate(CosTheta(*wi)) * R / AbsCosTheta(*wi);
+	}
+
+	// 斯涅尔定律计算折射方向、检查全内反射、菲涅尔计算透射能量
+	Spectrum SpecularTransmission::Sample_f(const Vector3f& wo, Vector3f* wi,
+		const Point2f& sample, float* pdf, BxDFType* sampledType) const {
+		bool entering = CosTheta(wo) > 0;
+		float etaI = entering ? etaA : etaB;
+		float etaT = entering ? etaB : etaA;
+		if (!Refract(wo, Faceforward(Normal3f(0, 0, 1), wo), etaI / etaT, wi)) {
+			/**wi = Vector3f(-wo.x, -wo.y, wo.z);
+			*pdf = 1;
+			return Spectrum(1.) * T / AbsCosTheta(*wi);*/
+			return 0;
+		}
+		else {
+			*pdf = 1;
+			Spectrum ft = T * (Spectrum(1.) - fresnel.Evaluate(CosTheta(*wi)));
+			if (mode == TransportMode::Radiance) ft *= (etaI * etaI) / (etaT * etaT);
+			return ft / AbsCosTheta(*wi);
+		}
+	}
+
+	// 菲涅尔计算反射概率，根据采样的随机数判断反射或折射
+	Spectrum FresnelSpecular::Sample_f(const Vector3f& wo, Vector3f* wi,
+		const Point2f& u, float* pdf, BxDFType* sampledType) const {
+		float F = FrDielectric(CosTheta(wo), etaA, etaB);
+		if (u[0] < F) {
+			*wi = Vector3f(-wo.x, -wo.y, wo.z);
+			if (sampledType)
+				*sampledType = BxDFType(BSDF_SPECULAR | BSDF_REFLECTION);
+			*pdf = F;
+			return F * R / AbsCosTheta(*wi);
+		}
+		else {
+			bool entering = CosTheta(wo) > 0;
+			float etaI = entering ? etaA : etaB;
+			float etaT = entering ? etaB : etaA;
+			if (!Refract(wo, Faceforward(Normal3f(0, 0, 1), wo), etaI / etaT, wi))
+				return 0;
+			Spectrum ft = T * (1 - F);
+			if (mode == TransportMode::Radiance)
+				ft *= (etaI * etaI) / (etaT * etaT);
+			if (sampledType)
+				*sampledType = BxDFType(BSDF_SPECULAR | BSDF_TRANSMISSION);
+			*pdf = 1 - F;
+			return ft / AbsCosTheta(*wi);
+		}
+	}
+
+	// DGF乘在一起：朝向的微表面*是否被遮挡*反射了多少能量
+	Spectrum MicrofacetReflection::f(const Vector3f& wo, const Vector3f& wi) const {
+		float cosThetaO = AbsCosTheta(wo), cosThetaI = AbsCosTheta(wi);
+		Vector3f wh = wi + wo;
+		// Handle degenerate cases for microfacet reflection
+		if (cosThetaI == 0 || cosThetaO == 0) return Spectrum(0.);
+		if (wh.x == 0 && wh.y == 0 && wh.z == 0) return Spectrum(0.);
+		wh = Normalize(wh);
+		// For the Fresnel call, make sure that wh is in the same hemisphere
+		// as the surface normal, so that TIR is handled correctly.
+		Spectrum F = fresnel->Evaluate(Dot(wi, Faceforward(wh, Vector3f(0, 0, 1))));
+		return R * distribution->D(wh) * distribution->G(wo, wi) * F /
+			(4 * cosThetaI * cosThetaO);
+	}
+
+	// 按概率采样高光，使用f计算颜色
+	Spectrum MicrofacetReflection::Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& u,
+		float* pdf, BxDFType* sampledType) const {
+		if (wo.z == 0) return 0.;
+		Vector3f wh = distribution->Sample_wh(wo, u);
+		if (Dot(wo, wh) < 0) return 0.;   
+		*wi = Reflect(wo, wh);
+		if (!SameHemisphere(wo, *wi)) return Spectrum(0.f);
+
+		*pdf = distribution->Pdf(wo, wh) / (4 * Dot(wo, wh));
+		return f(wo, *wi);
+	}
+
+	// Sample_f得到的概率
+	float MicrofacetReflection::Pdf(const Vector3f& wo, const Vector3f& wi) const {
+		if (!SameHemisphere(wo, wi)) return 0;
+		Vector3f wh = Normalize(wo + wi);
+		return distribution->Pdf(wo, wh) / (4 * Dot(wo, wh));
+	}
+
+	// 折射版本的T-S公式
+	Spectrum MicrofacetTransmission::f(const Vector3f& wo, const Vector3f& wi) const {
+		if (SameHemisphere(wo, wi)) return 0;  // transmission only
+
+		float cosThetaO = CosTheta(wo);
+		float cosThetaI = CosTheta(wi);
+		if (cosThetaI == 0 || cosThetaO == 0) return Spectrum(0);
+
+		// Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
+		float eta = CosTheta(wo) > 0 ? (etaB / etaA) : (etaA / etaB);
+		Vector3f wh = Normalize(wo + wi * eta);
+		if (wh.z < 0) wh = -wh;
+
+		// Same side?
+		if (Dot(wo, wh) * Dot(wi, wh) > 0) return Spectrum(0);
+
+		Spectrum F = fresnel.Evaluate(Dot(wo, wh));
+
+		float sqrtDenom = Dot(wo, wh) + eta * Dot(wi, wh);
+		float factor = (mode == TransportMode::Radiance) ? (1 / eta) : 1;
+
+		return (Spectrum(1.f) - F) * T *
+			std::abs(distribution->D(wh) * distribution->G(wo, wi) * eta * eta *
+				AbsDot(wi, wh) * AbsDot(wo, wh) * factor * factor /
+				(cosThetaI * cosThetaO * sqrtDenom * sqrtDenom));
+	}
+
+	// 采样折射光
+	Spectrum MicrofacetTransmission::Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& u,
+		float* pdf, BxDFType* sampledType) const {
+		if (wo.z == 0) return 0.;
+		Vector3f wh = distribution->Sample_wh(wo, u);
+		if (Dot(wo, wh) < 0) return 0.;  // Should be rare
+
+		float eta = CosTheta(wo) > 0 ? (etaA / etaB) : (etaB / etaA);
+		if (!Refract(wo, (Normal3f)wh, eta, wi)) return 0;
+		*pdf = Pdf(wo, *wi);
+		return f(wo, *wi);
+	}
+
+	// 折射的PDF
+	float MicrofacetTransmission::Pdf(const Vector3f& wo, const Vector3f& wi) const {
+		if (SameHemisphere(wo, wi)) return 0;
+		// Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
+		float eta = CosTheta(wo) > 0 ? (etaB / etaA) : (etaA / etaB);
+		Vector3f wh = Normalize(wo + wi * eta);
+
+		if (Dot(wo, wh) * Dot(wi, wh) > 0) return 0;
+
+		// Compute change of variables _dwh\_dwi_ for microfacet transmission
+		float sqrtDenom = Dot(wo, wh) + eta * Dot(wi, wh);
+		float dwh_dwi =
+			std::abs((eta * eta * Dot(wi, wh)) / (sqrtDenom * sqrtDenom));
+		return distribution->Pdf(wo, wh) * dwh_dwi;
+	}
+
+	FresnelBlend::FresnelBlend(const Spectrum& Rd, const Spectrum& Rs,
+		MicrofacetDistribution* distribution)
+		: BxDF(BxDFType(BSDF_REFLECTION | BSDF_GLOSSY)),
+		Rd(Rd),
+		Rs(Rs),
+		distribution(distribution) {}
+
+	// 将颜色分为两部分
+	Spectrum FresnelBlend::f(const Vector3f& wo, const Vector3f& wi) const {
+		auto pow5 = [](float v) { return (v * v) * (v * v) * v; };
+		Spectrum diffuse = (28.f / (23.f * Pi)) * Rd * (Spectrum(1.f) - Rs) *
+			(1 - pow5(1 - .5f * AbsCosTheta(wi))) *
+			(1 - pow5(1 - .5f * AbsCosTheta(wo)));
+		Vector3f wh = wi + wo;
+		if (wh.x == 0 && wh.y == 0 && wh.z == 0) return Spectrum(0);
+		wh = Normalize(wh);
+		Spectrum specular =
+			distribution->D(wh) /
+			(4 * AbsDot(wi, wh) * std::max(AbsCosTheta(wi), AbsCosTheta(wo))) *
+			SchlickFresnel(Dot(wi, wh));
+		return diffuse + specular;
+	}
+
+	// 50%概率漫反射
+	Spectrum FresnelBlend::Sample_f(const Vector3f& wo, Vector3f* wi, const Point2f& uOrig,
+		float* pdf, BxDFType* sampledType) const {
+		Point2f u = uOrig;
+		if (u[0] < .5) {
+			u[0] = std::min(2 * u[0], OneMinusEpsilon);
+			// Cosine-sample the hemisphere, flipping the direction if necessary
+			*wi = CosineSampleHemisphere(u);
+			if (wo.z < 0) wi->z *= -1;
+		}
+		else {
+			u[0] = std::min(2 * (u[0] - .5f), OneMinusEpsilon);
+			// Sample microfacet orientation $\wh$ and reflected direction $\wi$
+			Vector3f wh = distribution->Sample_wh(wo, u);
+			*wi = Reflect(wo, wh);
+			if (!SameHemisphere(wo, *wi)) return Spectrum(0.f);
+		}
+		*pdf = Pdf(wo, *wi);
+		return f(wo, *wi);
+	}
+	float FresnelBlend::Pdf(const Vector3f& wo, const Vector3f& wi) const {
+		if (!SameHemisphere(wo, wi)) return 0;
+		Vector3f wh = Normalize(wo + wi);
+		float pdf_wh = distribution->Pdf(wo, wh);
+		return .5f * (AbsCosTheta(wi) * InvPi + pdf_wh / (4 * Dot(wo, wh)));
 	}
 }

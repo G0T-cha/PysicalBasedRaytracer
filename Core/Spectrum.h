@@ -18,6 +18,12 @@ namespace PBR {
         xyz[2] = 0.019334f * rgb[0] + 0.119193f * rgb[1] + 0.950227f * rgb[2];
     }
 
+    inline float GammaCorrect(float v) {
+        if (v <= 0.0031308f)
+            return 12.92f * v;
+        return 1.055f * std::pow(v, (1.f / 2.4f)) - 0.055f;
+    }
+
     enum class SpectrumType { Reflectance, Illuminant };
 
     // Spectrum Declarations
@@ -236,6 +242,10 @@ namespace PBR {
             return YWeight[0] * c[0] + YWeight[1] * c[1] + YWeight[2] * c[2];
         }
     };
+
+    inline RGBSpectrum Lerp(float t, const RGBSpectrum& s1, const RGBSpectrum& s2) {
+        return (1 - t) * s1 + t * s2;
+    }
 
     
 

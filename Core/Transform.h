@@ -115,6 +115,7 @@ namespace PBR
         inline Normal3<T> operator()(const Normal3<T>&) const;
         Bounds3f operator()(const Bounds3f& b) const;
         inline Ray operator()(const Ray& r) const;
+        inline RayDifferential operator()(const RayDifferential& r) const;
         Transform operator*(const Transform& t2) const;
         bool SwapsHandedness() const;
 
@@ -131,6 +132,8 @@ namespace PBR
     Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up);
     Transform Orthographic(float znear, float zfar);
     Transform Perspective(float fov, float znear, float zfar);
+    bool SolveLinearSystem2x2(const float A[2][2], const float B[2], float* x0,
+        float* x1);
 
     template <typename T>
     inline Point3<T> Transform::operator()(const Point3<T>& p) const {
@@ -164,6 +167,17 @@ namespace PBR
         Vector3f d = (*this)(r.d);
         float tMax = r.tMax;
         return Ray(o, d, tMax, r.time);
+    }
+
+    inline RayDifferential Transform::operator()(const RayDifferential& r) const {
+        Ray tr = (*this)(Ray(r));
+        RayDifferential ret(tr.o, tr.d, tr.tMax, tr.time);
+        ret.hasDifferentials = r.hasDifferentials;
+        ret.rxOrigin = (*this)(r.rxOrigin);
+        ret.ryOrigin = (*this)(r.ryOrigin);
+        ret.rxDirection = (*this)(r.rxDirection);
+        ret.ryDirection = (*this)(r.ryDirection);
+        return ret;
     }
 }
 #endif // !TRANSFORM_H

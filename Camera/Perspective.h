@@ -11,11 +11,15 @@ namespace PBR {
         // PerspectiveCamera Public Methods
         PerspectiveCamera(const int RasterWidth, const int RasterHeight, const Transform& CameraToWorld,
             const Bounds2f& screenWindow, float lensRadius, float focalDistance,
-            float fov);
+            float fov, const Medium* medium);
         float GenerateRay(const CameraSample& sample, Ray*) const;
+        virtual float GenerateRayDifferential(const CameraSample& sample,
+            RayDifferential* rd) const;
+    private:
+        Vector3f dxCamera, dyCamera;
     };
 
-    PerspectiveCamera* CreatePerspectiveCamera(const int RasterWidth, const int RasterHeight, const Transform& cam2world);
+    PerspectiveCamera* CreatePerspectiveCamera(const int RasterWidth, const int RasterHeight, const Transform& cam2world, Medium* media);
 }
 
 #endif

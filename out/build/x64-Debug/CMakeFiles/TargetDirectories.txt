@@ -1,3 +1,0 @@
-C:/Users/99531/Desktop/book/PBR-v1/out/build/x64-Debug/CMakeFiles/PBR.dir
-C:/Users/99531/Desktop/book/PBR-v1/out/build/x64-Debug/CMakeFiles/edit_cache.dir
-C:/Users/99531/Desktop/book/PBR-v1/out/build/x64-Debug/CMakeFiles/rebuild_cache.dir
