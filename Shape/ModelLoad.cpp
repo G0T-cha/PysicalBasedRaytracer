@@ -8,13 +8,20 @@
 #include "Texture\ImageTexture.h"      // 确保 ImageTexture 被包含
 #include "Material\MatteMaterial.h"
 #include "Material\PlasticMaterial.h"
-#include <assimp/scene.h> 
-#include <iostream> 
+
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <assimp/pbrmaterial.h>
+// -----------------------
+#include <iostream>
 #include <string>
 #include <vector>
-#include <map> 
+#include <map>
+#include <algorithm>
+#include <fstream>
 
-namespace PBR {
+/*namespace PBR {
 
     // (processMesh, processNode, loadModel, getDiffuseMaterial 保持不变)
     // ...
@@ -80,7 +87,7 @@ namespace PBR {
     void ModelLoad::loadModel(std::string path, const Transform& ObjectToWorld) {
         // (此函数保持原样)
         Assimp::Importer import;
-        const aiScene* scene = import.ReadFile(path, aiProcess_Triangulate);
+        const aiScene* scene = import.ReadFile(path, aiProcess_Triangulate); // 已移除 FlipUVs
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
         {
             std::cerr << "ERROR: Assimp failed to load model: " << path << std::endl;
@@ -108,25 +115,23 @@ namespace PBR {
     }
 
     // ==========================================================
-    // 1. 替换 getPlasticMaterial
+    // 1. 替换 getPlasticMaterial 为 createManualPbrMaterial
     // ==========================================================
 
-    /**
-     * @brief 为 PBR 纹理 (Diffuse, Metalness, Roughness) 创建一个 PlasticMaterial。
-     * 这是您渲染器中实现 PBR 的（手动）方式。
-     */
+
     inline std::shared_ptr<Material> createManualPbrMaterial(
         const std::string& diffFilename,
         const std::string& metalFilename,
-        const std::string& roughFilename)
+        const std::string& roughFilename,
+        const std::string& normalFilename) // <-- 新增法线贴图
     {
         // --- 1. 加载 Diffuse (Kd) ---
         std::shared_ptr<Texture<Spectrum>> plasticKd;
         if (diffFilename.empty()) {
-            plasticKd = std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5f)); // 默认灰色
+            plasticKd = std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5f));
         }
         else {
-            std::cout << "DEBUG: [createManualPbrMaterial] Loading Kd: " << diffFilename << std::endl;
+            std::cout << "DEBUG: [PBR] Loading Kd: " << diffFilename << std::endl;
             std::unique_ptr<TextureMapping2D> map1 = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f);
             plasticKd = std::make_shared<ImageTexture<RGBSpectrum, Spectrum>>(std::move(map1), diffFilename, false, 8.f, ImageWrap::Repeat, 1.f, false);
         }
@@ -134,37 +139,44 @@ namespace PBR {
         // --- 2. 加载 Metalness (用作 Ks) ---
         std::shared_ptr<Texture<Spectrum>> plasticKr;
         if (metalFilename.empty()) {
-            plasticKr = std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.0f)); // 默认非金属 (黑色)
+            plasticKr = std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.0f)); // 默认非金属
         }
         else {
-            std::cout << "DEBUG: [createManualPbrMaterial] Loading Kr (from Metal): " << metalFilename << std::endl;
+            std::cout << "DEBUG: [PBR] Loading Kr (from Metal): " << metalFilename << std::endl;
             std::unique_ptr<TextureMapping2D> map2 = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f);
-            // 我们仍然将金属度加载为 Spectrum，因为 Ks 槽需要它
             plasticKr = std::make_shared<ImageTexture<RGBSpectrum, Spectrum>>(std::move(map2), metalFilename, false, 8.f, ImageWrap::Repeat, 1.f, false);
         }
 
         // --- 3. 加载 Roughness (粗糙度) ---
         std::shared_ptr<Texture<float>> plasticRoughness;
         if (roughFilename.empty()) {
-            // 如果没有粗糙度贴图，才回退到硬编码值
-            std::cout << "DEBUG: [createManualPbrMaterial] No roughness map. Using Constant 0.8." << std::endl;
+            std::cout << "DEBUG: [PBR] No roughness map. Using Constant 0.8." << std::endl;
             plasticRoughness = std::make_shared<ConstantTexture<float>>(0.8f);
         }
         else {
-            // 否则，加载粗糙度贴图
-            // 【重要】: 这假设 ImageTexture<float, float> 可以工作 (即 MIPMap 支持 float)
-            std::cout << "DEBUG: [createManualPbrMaterial] Loading Roughness: " << roughFilename << std::endl;
+            // 【重要】: 粗糙度贴图是单通道 (float)，所以我们使用 ImageTexture<float, float>
+            std::cout << "DEBUG: [PBR] Loading Roughness: " << roughFilename << std::endl;
             std::unique_ptr<TextureMapping2D> map3 = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f);
             plasticRoughness = std::make_shared<ImageTexture<float, float>>(std::move(map3), roughFilename, false, 8.f, ImageWrap::Repeat, 1.f, false);
         }
 
-        // --- 4. 创建材质 ---
-        std::shared_ptr<Texture<float>> bumpMap = std::make_shared<ConstantTexture<float>>(0.0f);
-        // remapRoughness 参数: 您的 MetalMaterial 设为 false，这里也设为 false
-        return std::make_shared<PlasticMaterial>(plasticKd, plasticKr, plasticRoughness, bumpMap, false);
-    }
+        // --- 4. 加载 Normal (法线) ---
+        std::shared_ptr<Texture<Spectrum>> normalMap;
+        if (normalFilename.empty()) {
+            std::cout << "DEBUG: [PBR] No normal map. Using nullptr." << std::endl;
+            normalMap = nullptr; // 传递一个空指针
+        }
+        else {
+            // 【重要】: 法线贴图存储的是向量 (XYZ)，编码在 RGB 颜色中，所以我们使用 ImageTexture<RGBSpectrum, Spectrum>
+            std::cout << "DEBUG: [PBR] Loading Normal: " << normalFilename << std::endl;
+            std::unique_ptr<TextureMapping2D> map4 = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f);
+            normalMap = std::make_shared<ImageTexture<RGBSpectrum, Spectrum>>(std::move(map4), normalFilename, false, 8.f, ImageWrap::Repeat, 1.f, false);
+        }
 
-    // (旧的 getPlasticMaterial 函数现在可以删除了，因为它被 createManualPbrMaterial 替代了)
+        // --- 5. 创建材质 ---
+        // (注意我们将 normalMap 传递给了 bumpMap 插槽)
+        return std::make_shared<PlasticMaterial>(plasticKd, plasticKr, plasticRoughness, normalMap, false);
+    }
 
 
     // ... (buildNoTextureModel 保持不变) ...
@@ -194,50 +206,45 @@ namespace PBR {
     void ModelLoad::buildTextureModel(Transform& tri_Object2World, const MediumInterface& mediumInterface,
         std::vector<std::shared_ptr<Primitive>>& prims) {
 
-        // --- 1. 手动创建材质 ---
         std::cout << "--- Pre-loading materials ---" << std::endl;
         preloadedMaterials.clear();
 
-        // 这现在会调用我们的新函数，并传入 _R.png 贴图
+        // 现在调用新函数，传入4个纹理
         preloadedMaterials["cloth"] = createManualPbrMaterial(
-            directory + "/T_cloth_D.png", // 漫反射 (Kd)
-            directory + "/T_cloth_M.png", // 金属度 (Ks)
-            directory + "/T_cloth_R.png"  // 粗糙度 (Roughness)
+            directory + "/T_cloth_D.png",
+            directory + "/T_cloth_M.png",
+            directory + "/T_cloth_R.png",
+            directory + "/T_cloth_N.png"
         );
 
-        // 这满足了您“getMetalMaterial”的请求
         preloadedMaterials["metal"] = createManualPbrMaterial(
             directory + "/T_metal_D.png",
             directory + "/T_metal_M.png",
-            directory + "/T_metal_R.png"
+            directory + "/T_metal_R.png",
+            directory + "/T_metal_N.png"
         );
 
-        // 【注意】: 您的文件名有 "T_swordl_D.png"，我猜是 "T_sword_D.png"
         preloadedMaterials["sword"] = createManualPbrMaterial(
-            directory + "/T_sword_D.png", // (如果真的是 'l' 请修改这里)
+            directory + "/T_sword_D.png", // (假设 'l' 是多余的)
             directory + "/T_sword_M.png", // (假设 T_sword_M.png 存在)
-            directory + "/T_sword_R.png"
+            directory + "/T_sword_R.png",
+            directory + "/T_sword_N.png"  // (假设 T_sword_N.png 存在)
         );
 
-        // 默认材质，用于未匹配的网格
-        preloadedMaterials["default"] = createManualPbrMaterial("", "", "");
+        preloadedMaterials["default"] = createManualPbrMaterial("", "", "", "");
         std::cout << "--- Material pre-loading complete ---" << std::endl;
 
 
         std::vector<std::shared_ptr<Shape>> trisObj;
         Transform tri_World2Object = Inverse(tri_Object2World);
 
-        // --- 2. 循环所有网格并分配材质 ---
         std::cout << "--- Assigning materials to meshes ---" << std::endl;
         for (int i = 0; i < meshes.size(); i++) {
-
+            // (这部分的手动匹配逻辑保持原样)
             std::string meshName = meshNames[i];
             std::cout << "Processing Mesh (" << i << "/" << meshes.size() << "): " << meshName << std::endl;
-
-            // --- 手动分配材质 ---
             std::shared_ptr<Material> finalMaterial = preloadedMaterials["default"];
             std::string materialName = "default";
-
             if (meshName.rfind("Hood", 0) == 0 ||
                 meshName.rfind("Padded", 0) == 0 ||
                 meshName.rfind("Dress", 0) == 0)
@@ -263,12 +270,7 @@ namespace PBR {
                 finalMaterial = preloadedMaterials["metal"];
                 materialName = "metal";
             }
-
             std::cout << "  -> Match: '" << materialName << "'. Assigning material." << std::endl;
-
-
-            // --- 3. 创建图元 ---
-            // (此部分保持不变，它现在会使用正确的 finalMaterial)
             if (mediumInterface.inside == nullptr && mediumInterface.outside == nullptr) {
                 for (int j = 0; j < meshes[i]->nTriangles; ++j) {
                     std::shared_ptr<TriangleMesh> meshPtr = meshes[i];
@@ -287,14 +289,199 @@ namespace PBR {
                 }
             }
         }
-
-        // --- 4. 清理 ---
         meshes.clear();
         diffTexName.clear();
         specTexName.clear();
         meshNames.clear();
         preloadedMaterials.clear();
         directory = "";
+    }
+
+}*/ // namespace PBR
+
+namespace PBR {
+
+    static std::string sanitizePath(std::string path) {
+        std::replace(path.begin(), path.end(), '\\', '/');
+        return path;
+    }
+
+    static std::string extractEmbeddedTexture(const aiScene* scene, const std::string& rawPath, const std::string& baseDir) {
+        if (rawPath.empty() || rawPath[0] != '*') return "";
+        try {
+            int texIndex = std::stoi(rawPath.substr(1));
+            if (texIndex < 0 || texIndex >= scene->mNumTextures) return "";
+            aiTexture* tex = scene->mTextures[texIndex];
+            std::string ext = (tex->achFormatHint[0]) ? std::string(tex->achFormatHint) : "png";
+            std::string fileName = "embedded_tex_" + std::to_string(texIndex) + "." + ext;
+            std::string fullPath = baseDir + "/" + fileName;
+            std::ifstream check(fullPath);
+            if (check.good()) { check.close(); return sanitizePath(fullPath); }
+            check.close();
+            if (tex->mHeight == 0) {
+                std::cout << "  [Texture Extract] Saving embedded texture [" << texIndex << "] to: " << fileName << std::endl;
+                std::ofstream file(fullPath, std::ios::binary);
+                if (file.is_open()) { file.write(reinterpret_cast<char*>(tex->pcData), tex->mWidth); file.close(); return sanitizePath(fullPath); }
+                else { std::cerr << "  [Texture Extract] ERROR: Could not write file: " << fullPath << std::endl; }
+            }
+            else { std::cerr << "  [Texture Extract] WARNING: Uncompressed texture ignored." << std::endl; }
+        }
+        catch (...) {}
+        return "";
+    }
+
+    std::shared_ptr<TriangleMesh> ModelLoad::processMesh(aiMesh* mesh, const aiScene* scene, const Transform& ObjectToWorld) {
+        long nVertices = mesh->mNumVertices;
+        long nTriangles = mesh->mNumFaces;
+        if (nVertices == 0 || nTriangles == 0) return nullptr;
+
+        std::vector<int> vertexIndices(nTriangles * 3);
+        std::vector<Point3f> P(nVertices);
+        std::vector<Normal3f> N(nVertices);
+        std::vector<Point2f> uv(nVertices);
+
+        for (long i = 0; i < nVertices; i++) {
+            P[i] = Point3f(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
+            if (mesh->HasNormals()) N[i] = Normal3f(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+            else N[i] = Normal3f(0, 1, 0);
+            if (mesh->HasTextureCoords(0)) uv[i] = Point2f(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
+            else uv[i] = Point2f(0.f, 0.f);
+        }
+        for (long i = 0; i < nTriangles; i++) {
+            aiFace face = mesh->mFaces[i];
+            if (face.mNumIndices != 3) continue;
+            vertexIndices[3 * i + 0] = face.mIndices[0];
+            vertexIndices[3 * i + 1] = face.mIndices[1];
+            vertexIndices[3 * i + 2] = face.mIndices[2];
+        }
+        return std::make_shared<TriangleMesh>(ObjectToWorld, nTriangles, vertexIndices.data(), nVertices, P.data(), nullptr, mesh->HasNormals() ? N.data() : nullptr, mesh->HasTextureCoords(0) ? uv.data() : nullptr, nullptr);
+    }
+
+    void ModelLoad::processNode(aiNode* node, const aiScene* scene, const Transform& ObjectToWorld) {
+        for (unsigned int i = 0; i < node->mNumMeshes; i++) {
+            aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+            std::shared_ptr<TriangleMesh> pbrtMesh = processMesh(mesh, scene, ObjectToWorld);
+            if (pbrtMesh) { meshes.push_back(pbrtMesh); meshMaterialIndices.push_back(mesh->mMaterialIndex); }
+        }
+        for (unsigned int i = 0; i < node->mNumChildren; i++) processNode(node->mChildren[i], scene, ObjectToWorld);
+    }
+
+    void ModelLoad::loadModel(std::string path, const Transform& ObjectToWorld) {
+        std::cout << "[ModelLoad] Starting load: " << path << std::endl;
+        Assimp::Importer import;
+        //const aiScene* scene = import.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_PreTransformVertices | aiProcess_CalcTangentSpace);
+        const aiScene* scene = import.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_PreTransformVertices | aiProcess_CalcTangentSpace);
+        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { std::cerr << "[ModelLoad] ERROR::ASSIMP::" << import.GetErrorString() << std::endl; return; }
+
+        path = sanitizePath(path);
+        directory = path.substr(0, path.find_last_of('/'));
+        if (directory.empty()) directory = ".";
+
+        std::cout << "[ModelLoad] Scene loaded. Materials: " << scene->mNumMaterials << ", Embedded Textures: " << scene->mNumTextures << std::endl;
+        loadedMaterials.resize(scene->mNumMaterials);
+
+        for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
+            aiMaterial* mat = scene->mMaterials[i];
+            auto getTexPath = [&](aiTextureType type) -> std::string {
+                aiString str;
+                if (mat->GetTexture(type, 0, &str) == AI_SUCCESS) {
+                    std::string raw = str.C_Str();
+                    if (raw.length() > 0 && raw[0] == '*') return extractEmbeddedTexture(scene, raw, directory);
+                    return sanitizePath(directory + "/" + raw);
+                }
+                return "";
+            };
+
+            std::string diffPath = getTexPath(aiTextureType_DIFFUSE);
+            // if (diffPath.empty()) diffPath = getTexPath(aiTextureType_BASE_COLOR); // Uncomment for newer Assimp if needed
+            std::string metalPath = getTexPath(aiTextureType_UNKNOWN);
+            if (metalPath.empty()) metalPath = getTexPath(aiTextureType_METALNESS);
+            std::string normalPath = getTexPath(aiTextureType_NORMALS);
+
+            if (i < 5) {
+                std::cout << "  Mat[" << i << "] '" << mat->GetName().C_Str() << "': D='" << (diffPath.empty() ? "MISSING" : "OK") << "', N='" << (normalPath.empty() ? "MISSING" : "OK") << "'" << std::endl;
+            }
+
+            std::unique_ptr<TextureMapping2D> mapUV = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f);
+            std::shared_ptr<Texture<Spectrum>> kdTex, ksTex, normalTex;
+            std::shared_ptr<Texture<float>> roughTex;
+
+            if (!diffPath.empty()) kdTex = std::make_shared<ImageTexture<RGBSpectrum, Spectrum>>(std::move(mapUV), diffPath, false, 8.f, ImageWrap::Repeat, 1.f, true);
+            else { aiColor3D c(0.5f, 0.5f, 0.5f); mat->Get(AI_MATKEY_BASE_COLOR, c); kdTex = std::make_shared<ConstantTexture<Spectrum>>(Spectrum::FromRGB(reinterpret_cast<float*>(&c))); }
+
+            if (!metalPath.empty()) {
+                mapUV = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f); ksTex = std::make_shared<ImageTexture<RGBSpectrum, Spectrum>>(std::move(mapUV), metalPath, false, 8.f, ImageWrap::Repeat, 1.f, false);
+                mapUV = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f); roughTex = std::make_shared<ImageTexture<float, float>>(std::move(mapUV), metalPath, false, 8.f, ImageWrap::Repeat, 1.f, false);
+            }
+            else { ksTex = std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.0f)); roughTex = std::make_shared<ConstantTexture<float>>(0.5f); }
+
+            if (!normalPath.empty()) { mapUV = std::make_unique<UVMapping2D>(1.f, 1.f, 0.f, 0.f); normalTex = std::make_shared<ImageTexture<RGBSpectrum, Spectrum>>(std::move(mapUV), normalPath, false, 8.f, ImageWrap::Repeat, 1.f, false); }
+
+            loadedMaterials[i] = std::make_shared<PlasticMaterial>(kdTex, ksTex, roughTex, normalTex, false);
+        }
+        processNode(scene->mRootNode, scene, ObjectToWorld);
+        std::cout << "[ModelLoad] Load Finished. Total Meshes: " << meshes.size() << std::endl;
+    }
+
+    void ModelLoad::buildNoTextureModel(Transform& tri_Object2World, const MediumInterface& mediumInterface,
+        std::vector<std::shared_ptr<Primitive>>& prims, std::shared_ptr<Material> material) {
+
+        std::cout << "[ModelLoad] Building NO-TEXTURE primitives..." << std::endl;
+        Transform tri_World2Object = Inverse(tri_Object2World);
+        Bounds3f totalBounds; // 包围盒
+        size_t startPrimCount = prims.size();
+
+        for (size_t i = 0; i < meshes.size(); i++) {
+            std::shared_ptr<TriangleMesh> meshPtr = meshes[i];
+            for (int j = 0; j < meshPtr->nTriangles; ++j) {
+                auto tri = std::make_shared<Triangle>(&tri_Object2World, &tri_World2Object, false, meshPtr, j);
+                prims.push_back(std::make_shared<GeometricPrimitive>(tri, material, nullptr, mediumInterface));
+                totalBounds = Union(totalBounds, tri->WorldBound());
+            }
+        }
+
+        Point3f c = (totalBounds.pMin + totalBounds.pMax) * 0.5f;
+        std::cout << "=======================================================" << std::endl;
+        std::cout << "[ModelLoad] NO-TEXTURE BUILD SUMMARY:" << std::endl;
+        std::cout << "  > Added Primitives: " << (prims.size() - startPrimCount) << std::endl;
+        std::cout << "  > Total World Bounds: Min(" << totalBounds.pMin.x << "," << totalBounds.pMin.y << "," << totalBounds.pMin.z << ") - "
+            << "Max(" << totalBounds.pMax.x << "," << totalBounds.pMax.y << "," << totalBounds.pMax.z << ")" << std::endl;
+        std::cout << "  > SUGGESTED Camera LookAt: (" << c.x << ", " << c.y << ", " << c.z << ")" << std::endl;
+        std::cout << "=======================================================" << std::endl;
+
+        meshes.clear(); meshMaterialIndices.clear(); loadedMaterials.clear(); directory = "";
+    }
+
+    void ModelLoad::buildTextureModel(Transform& tri_Object2World, const MediumInterface& mediumInterface,
+        std::vector<std::shared_ptr<Primitive>>& prims) {
+
+        std::cout << "[ModelLoad] Building TEXTURED primitives..." << std::endl;
+        Transform tri_World2Object = Inverse(tri_Object2World);
+        Bounds3f totalBounds; // 包围盒
+        size_t startPrimCount = prims.size();
+
+        for (size_t i = 0; i < meshes.size(); ++i) {
+            std::shared_ptr<TriangleMesh> meshPtr = meshes[i];
+            std::shared_ptr<Material> material = loadedMaterials[meshMaterialIndices[i]];
+            if (!material) material = std::make_shared<MatteMaterial>(std::make_shared<ConstantTexture<Spectrum>>(Spectrum(0.5f)), nullptr, nullptr);
+
+            for (int j = 0; j < meshPtr->nTriangles; ++j) {
+                auto tri = std::make_shared<Triangle>(&tri_Object2World, &tri_World2Object, false, meshPtr, j);
+                prims.push_back(std::make_shared<GeometricPrimitive>(tri, material, nullptr, mediumInterface));
+                totalBounds = Union(totalBounds, tri->WorldBound());
+            }
+        }
+
+        Point3f c = (totalBounds.pMin + totalBounds.pMax) * 0.5f;
+        std::cout << "=======================================================" << std::endl;
+        std::cout << "[ModelLoad] TEXTURED BUILD SUMMARY:" << std::endl;
+        std::cout << "  > Added Primitives: " << (prims.size() - startPrimCount) << std::endl;
+        std::cout << "  > Total World Bounds: Min(" << totalBounds.pMin.x << "," << totalBounds.pMin.y << "," << totalBounds.pMin.z << ") - "
+            << "Max(" << totalBounds.pMax.x << "," << totalBounds.pMax.y << "," << totalBounds.pMax.z << ")" << std::endl;
+        std::cout << "  > SUGGESTED Camera LookAt: (" << c.x << ", " << c.y << ", " << c.z << ")" << std::endl;
+        std::cout << "=======================================================" << std::endl;
+
+        meshes.clear(); meshMaterialIndices.clear(); loadedMaterials.clear(); directory = "";
     }
 
 } // namespace PBR

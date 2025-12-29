@@ -221,8 +221,10 @@ namespace PBR
             // ³ö´í
             return Transform();
         }
-        Vector3f right = Normalize(Cross(Normalize(up), dir));
-        Vector3f newUp = Cross(dir, right);
+        //Vector3f right = Normalize(Cross(Normalize(up), dir));
+        //Vector3f newUp = Cross(dir, right);
+        Vector3f right = Normalize(Cross(dir, Normalize(up)));
+        Vector3f newUp = Normalize(Cross(right, dir));
         cameraToWorld.m[0][0] = right.x;
         cameraToWorld.m[1][0] = right.y;
         cameraToWorld.m[2][0] = right.z;

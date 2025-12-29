@@ -60,7 +60,7 @@
 #include "stb_image_write.h"
 using namespace PBR;
 
-inline std::shared_ptr<PBR::Material> getSmileFacePlasticMaterial() {
+/*inline std::shared_ptr<PBR::Material> getSmileFacePlasticMaterial() {
 
     std::unique_ptr<PBR::TextureMapping2D> map = std::make_unique<PBR::UVMapping2D>(1.f, 1.f, 0.f, 0.f);
     std::string filename = "C:/Users/99531/Desktop/book/PBR-v1/Resources/awesomeface.jpg";
@@ -143,8 +143,7 @@ inline std::shared_ptr<PBR::Material> getSmileFacePlasticMaterial() {
         prims.push_back(std::make_shared<PBR::GeometricPrimitive>(trisBox[i], mat, nullptr, mediumInterface));
 }*/
 
-
-inline std::shared_ptr<PBR::Material> getGreeyMatteMaterial()
+/*inline std::shared_ptr<PBR::Material> getGreeyMatteMaterial()
 {
     PBR::Spectrum whiteColor;
     whiteColor[0] = 0.41;
@@ -155,19 +154,9 @@ inline std::shared_ptr<PBR::Material> getGreeyMatteMaterial()
     std::shared_ptr<PBR::Texture<float>> bumpMap = std::make_shared<PBR::ConstantTexture<float>>(0.0f);
     // 材质
     return std::make_shared<PBR::MatteMaterial>(KdWhite, sigma, bumpMap);
-}
+}*/
 
-inline std::shared_ptr<PBR::Material> getYellowMetalMaterial() {
-    PBR::Spectrum eta; eta[0] = 0.2f; eta[1] = 0.2f; eta[2] = 0.8f;
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> etaM = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(eta);
-    PBR::Spectrum k; k[0] = 0.11f; k[1] = 0.11f; k[2] = 0.11f;
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> kM = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(k);
-    std::shared_ptr<PBR::Texture<float>> Roughness = std::make_shared<PBR::ConstantTexture<float>>(0.15f);
-    std::shared_ptr<PBR::Texture<float>> RoughnessU = std::make_shared<PBR::ConstantTexture<float>>(0.15f);
-    std::shared_ptr<PBR::Texture<float>> RoughnessV = std::make_shared<PBR::ConstantTexture<float>>(0.15f);
-    std::shared_ptr<PBR::Texture<float>> bumpMap = std::make_shared<PBR::ConstantTexture<float>>(0.0f);
-    return 	std::make_shared<PBR::MetalMaterial>(etaM, kM, Roughness, RoughnessU, RoughnessV, bumpMap, false);
-}
+/*inline std::shared_ptr<PBR::Material> getYellowMetalMaterial()
 
 inline std::shared_ptr<PBR::Material> getWhiteGlassMaterial() {
     PBR::Spectrum c1; c1[0] = 0.98f; c1[1] = 0.98f; c1[2] = 0.98f;
@@ -180,14 +169,97 @@ inline std::shared_ptr<PBR::Material> getWhiteGlassMaterial() {
     std::shared_ptr<PBR::Texture<float>> bumpMap = std::make_shared<PBR::ConstantTexture<float>>(0.0f);
     return 	std::make_shared<PBR::GlassMaterial>(Kr, Kt,
         RoughnessU, RoughnessV, index, bumpMap, false);
+}*/
+
+inline void getBox(PBR::Transform& tri_Object2World, float xlength, float ylength, float zlength,
+    std::vector<std::shared_ptr<PBR::Primitive>>& prims, std::shared_ptr<PBR::Material>& mat, const MediumInterface& mediumInterface) {
+
+    // (这个函数直接取自您的 main.cpp，用于创建12个三角形组成的盒子)
+    const int nTrianglesBox = 2 * 6;
+    int vertexIndicesWall[nTrianglesBox * 3];
+    for (int i = 0; i < nTrianglesBox * 3; i++)
+        vertexIndicesWall[i] = i;
+    const int nVerticesBox = nTrianglesBox * 3;
+    float halfX = 0.5 * xlength, halfY = 0.5 * ylength, halfZ = 0.5 * zlength;
+    PBR::Point3f P_box[nVerticesBox] = {
+        //底板
+        PBR::Point3f(-halfX,-halfY,halfZ), PBR::Point3f(-halfX,-halfY,-halfZ), PBR::Point3f(halfX,-halfY,halfZ),
+        PBR::Point3f(halfX,-halfY,halfZ), PBR::Point3f(-halfX,-halfY,-halfZ), PBR::Point3f(halfX,-halfY,-halfZ),
+        //顶板
+        PBR::Point3f(-halfX,halfY,halfZ), PBR::Point3f(halfX,halfY,halfZ),PBR::Point3f(-halfX,halfY,-halfZ),
+        PBR::Point3f(halfX,halfY,halfZ), PBR::Point3f(halfX,halfY,-halfZ),PBR::Point3f(-halfX,halfY,-halfZ),
+        //后板
+        PBR::Point3f(-halfX,-halfY,-halfZ),PBR::Point3f(halfX,halfY,-halfZ),PBR::Point3f(halfX,-halfY,-halfZ),
+        PBR::Point3f(-halfX,-halfY,-halfZ),PBR::Point3f(-halfX,halfY,-halfZ), PBR::Point3f(halfX,halfY,-halfZ),
+        //前板
+        PBR::Point3f(-halfX,-halfY,halfZ),PBR::Point3f(halfX,-halfY,halfZ), PBR::Point3f(halfX,halfY,halfZ),
+        PBR::Point3f(-halfX,-halfY,halfZ), PBR::Point3f(halfX,halfY,halfZ),PBR::Point3f(-halfX,halfY,halfZ),
+        //右板
+        PBR::Point3f(-halfX,-halfY,-halfZ),PBR::Point3f(-halfX,-halfY,halfZ),PBR::Point3f(-halfX,halfY,halfZ),
+        PBR::Point3f(-halfX,-halfY,-halfZ),PBR::Point3f(-halfX,halfY,halfZ), PBR::Point3f(-halfX,halfY,-halfZ),
+        //左板
+        PBR::Point3f(halfX,-halfY,-halfZ),PBR::Point3f(halfX,-halfY,halfZ),PBR::Point3f(halfX,halfY,halfZ),
+        PBR::Point3f(halfX,-halfY,-halfZ),PBR::Point3f(halfX,halfY,halfZ), PBR::Point3f(halfX,halfY,-halfZ)
+    };
+
+    // (我们不需要UV，所以最后一个参数传 nullptr)
+    std::shared_ptr<PBR::TriangleMesh> meshBox = std::make_shared<PBR::TriangleMesh>
+        (tri_Object2World, nTrianglesBox, vertexIndicesWall, nVerticesBox, P_box, nullptr, nullptr, nullptr, nullptr);
+
+    PBR::Transform tri_World2Object = Inverse(tri_Object2World);
+    std::vector<std::shared_ptr<PBR::Shape>> trisBox;
+    for (int i = 0; i < 12; ++i)
+        trisBox.push_back(std::make_shared<PBR::Triangle>(&tri_Object2World, &tri_World2Object, false, meshBox, i));
+
+    for (int i = 0; i < trisBox.size(); ++i)
+        prims.push_back(std::make_shared<PBR::GeometricPrimitive>(trisBox[i], mat, nullptr, mediumInterface));
+}
+
+inline std::shared_ptr<PBR::Material> getDarkGrayMatteMaterial()
+{
+    PBR::Spectrum darkGray; darkGray[0] = 0.4f; darkGray[1] = 0.4f; darkGray[2] = 0.4f;
+    std::shared_ptr<PBR::Texture<PBR::Spectrum>> Kd = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(darkGray);
+    std::shared_ptr<PBR::Texture<float>> sigma = std::make_shared<PBR::ConstantTexture<float>>(0.0f);
+    return std::make_shared<PBR::MatteMaterial>(Kd, sigma, nullptr);
+}
+
+// 柱子 2: 浅灰金属
+inline std::shared_ptr<PBR::Material> getLightGrayMetalMaterial() {
+    // (使用类似铝的物理参数)
+    PBR::Spectrum eta; eta[0] = 1.657f; eta[1] = 1.621f; eta[2] = 1.564f;
+    std::shared_ptr<PBR::Texture<PBR::Spectrum>> etaM = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(eta);
+    PBR::Spectrum k; k[0] = 9.223f; k[1] = 9.232f; k[2] = 9.096f;
+    std::shared_ptr<PBR::Texture<PBR::Spectrum>> kM = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(k);
+    std::shared_ptr<PBR::Texture<float>> Roughness = std::make_shared<PBR::ConstantTexture<float>>(0.05f);
+    return 	std::make_shared<PBR::MetalMaterial>(etaM, kM, Roughness, Roughness, Roughness, nullptr, false);
+}
+
+inline std::shared_ptr<PBR::Material> getBluePurpleGlassMaterial() {
+    // 反射(Kr) 依然是白色，这在物理上是正确的
+    PBR::Spectrum white; white[0] = 1.0f; white[1] = 1.0f; white[2] = 1.0f;
+
+    // 定义 蓝紫色 (高 R, 低 G, 高 B)
+    PBR::Spectrum bluePurple;
+    bluePurple[0] = 0.6f; // Red
+    bluePurple[1] = 0.2f; // Green
+    bluePurple[2] = 0.9f; // Blue
+
+    std::shared_ptr<PBR::Texture<PBR::Spectrum>> Kr = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(white);
+    // 将透射(Kt)的颜色从 褐色(brown) 改为 蓝紫色(bluePurple)
+    std::shared_ptr<PBR::Texture<PBR::Spectrum>> Kt = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(bluePurple);
+
+    std::shared_ptr<PBR::Texture<float>> index = std::make_shared<PBR::ConstantTexture<float>>(1.5f); // 玻璃折射率
+    std::shared_ptr<PBR::Texture<float>> Roughness = std::make_shared<PBR::ConstantTexture<float>>(0.1f); // 保持轻微粗糙
+
+    return  std::make_shared<PBR::GlassMaterial>(Kr, Kt, Roughness, Roughness, index, nullptr, false);
 }
 
 
 int main(int argc, char* argv[]) {
 
-    const int WIDTH = 1200;
-    const int HEIGHT = 1200; // 使用正方形分辨率
-    const int samples_per_pixel = 1000;
+    const int WIDTH = 100;
+    const int HEIGHT = 100; // 使用正方形分辨率
+    const int samples_per_pixel = 100;
 
     // 2. 初始化帧缓冲区
     FrameBuffer* framebuffer = new FrameBuffer();
@@ -197,47 +269,16 @@ int main(int argc, char* argv[]) {
 
     //相机参数初始化
     std::shared_ptr<Camera> cam;
-    Point3f eye(0.f, -100.f, 40.f), look(0.0, -102.0f, 0.0f);
-    Vector3f up(0.0f, 1.0f, 0.0f);
+    Point3f look(0.0f, 0.0f, 0.0f);
+    Point3f eye(0.f, 0.f, 1.f);
+    Vector3f up(0.0f, 1.0f, 0.0f);// 保持 Y 轴向
     Transform lookat = LookAt(eye, look, up);
     Transform Camera2World = Inverse(lookat);
     cam = std::shared_ptr<Camera>(CreatePerspectiveCamera(WIDTH, HEIGHT, Camera2World, nullptr));
 
-    //常量纹理、材质
-    std::shared_ptr<Material> dragonMaterial;
-    std::shared_ptr<Material> whiteWallMaterial;
-    std::shared_ptr<Material> redWallMaterial;
-    std::shared_ptr<Material> blueWallMaterial;
-    std::shared_ptr<Material> whiteLightMaterial;
-    std::shared_ptr<Material> mirrorMaterial;
-    std::shared_ptr<Material> plasticMaterial;
-    std::shared_ptr<PBR::Material> smileFaceMaterial = getSmileFacePlasticMaterial();
-    std::shared_ptr<PBR::Material> yellowMetalMaterial = getYellowMetalMaterial();
-    std::shared_ptr<PBR::Material> whiteGlassMaterial = getWhiteGlassMaterial();
-    std::shared_ptr<PBR::Material> greeyDiffuseMaterial = getGreeyMatteMaterial();
-    PBR::Spectrum whiteColor; whiteColor[0] = 1.0; whiteColor[1] = 1.0; whiteColor[2] = 1.0;
-    PBR::Spectrum dragonColor; dragonColor[0] = 0.0; dragonColor[1] = 1.0; dragonColor[2] = 0.0;
-    PBR::Spectrum redWallColor; redWallColor[0] = 0.9; redWallColor[1] = 0.1; redWallColor[2] = 0.17;
-    PBR::Spectrum purpleColor; purpleColor[0] = 0.35; purpleColor[1] = 0.12; purpleColor[2] = 0.48;
-    PBR::Spectrum blueWallColor; blueWallColor[0] = 0.14; blueWallColor[1] = 0.21; blueWallColor[2] = 0.87;
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> KdDragon = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(dragonColor);
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> KrDragon = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(dragonColor);
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> KdWhite = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(whiteColor);
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> KdRed = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(redWallColor);
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> KdBlue = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(blueWallColor);
-    std::shared_ptr<PBR::Texture<PBR::Spectrum>> plasticKd = std::make_shared<ConstantTexture<Spectrum>>(purpleColor);
-    std::shared_ptr<Texture<Spectrum>> plasticKr = std::make_shared<ConstantTexture<Spectrum>>(Spectrum(1.f) - purpleColor);
-    std::shared_ptr<Texture<float>> plasticRoughness = std::make_shared<ConstantTexture<float>>(0.1f);
+
+    std::shared_ptr<Material> plasticMaterial = getDarkGrayMatteMaterial();
     std::shared_ptr<PBR::Texture<float>> sigma = std::make_shared<PBR::ConstantTexture<float>>(0.0f);
-    std::shared_ptr<PBR::Texture<float>> bumpMap = std::make_shared<PBR::ConstantTexture<float>>(0.0f);
-    dragonMaterial = std::make_shared<PBR::MatteMaterial>(KdDragon, sigma, bumpMap);
-    whiteWallMaterial = std::make_shared<PBR::MatteMaterial>(KdWhite, sigma, bumpMap);
-    redWallMaterial = std::make_shared<PBR::MatteMaterial>(KdRed, sigma, bumpMap);
-    blueWallMaterial = std::make_shared<PBR::MatteMaterial>(KdBlue, sigma, bumpMap);
-    whiteLightMaterial = std::make_shared<PBR::MatteMaterial>(KdWhite, sigma, bumpMap);
-    mirrorMaterial = std::make_shared<PBR::MirrorMaterial>(KdWhite, bumpMap);
-    plasticMaterial = std::make_shared<PBR::PlasticMaterial>(plasticKd, plasticKr, plasticRoughness, bumpMap, true);
-    std::cout << "Material initialized." << std::endl;
 
     PBR::HomogeneousMedium homoMedium(0.5, 4.4, -0.5);
     MediumInterface homoMediumInterface(&homoMedium, nullptr);
@@ -245,141 +286,78 @@ int main(int argc, char* argv[]) {
 
 
     std::vector<std::shared_ptr<PBR::Primitive>> prims;
+
     PBR::ModelLoad fbxLoader;
-    PBR::Transform fbx_Object2World = PBR::Translate(PBR::Vector3f(0.f, -200.f, -120.f)); //* PBR::Scale(0.5f, 0.5f, 0.5f);
-    std::string fbxPath = "C:/Users/99531/Desktop/book/PBR-v1/Resources/dark-knight/source/Knight_All.fbx";
+
+    PBR::Transform fbx_Object2World = Translate(PBR::Vector3f(0.f, -75.f, -20.f)) * RotateX(90) * RotateZ(0) * PBR::Translate(PBR::Vector3f(0.f, -36.f, 30.f)) * Scale(2.0f, 2.0f, 2.0f);
+    //PBR::Transform fbx_Object2World = Translate(PBR::Vector3f(0.f, -10.f, -20.f)) * RotateX(90) * RotateZ(0) * PBR::Translate(PBR::Vector3f(0.f, -36.f, 30.f))* Scale(2.0f, 2.0f, 2.0f);
+    //PBR::Transform fbx_Object2World = Translate(PBR::Vector3f(0.f, 0.f, -50.f)) * RotateX(90) * RotateZ(0) * PBR::Translate(PBR::Vector3f(0.f, -36.f, 30.f));
+    /*Vector3f currentRawCenter(1.52979f, 0.432972f, -2.86041f);
+    Transform ResetToOrigin = Translate(-currentRawCenter);
+    Transform StandUp = RotateX(90)* RotateY(30);
+    Transform ScaleUp = Scale(2.0f, 2.0f, 2.0f);
+    Transform PlaceInFront = Translate(Vector3f(0.0f, -1.0f, -8.0f));
+    PBR::Transform fbx_Object2World = PlaceInFront * StandUp * ScaleUp * ResetToOrigin;;*/
+    std::string fbxPath = "C:/Users/99531/Desktop/book/PBR-v1/Resources/apex/source/untitled.gltf";
     fbxLoader.loadModel(fbxPath, fbx_Object2World);
-    //fbxLoader.buildNoTextureModel(fbx_Object2World, noMedium, prims, plasticMaterial);
     fbxLoader.buildTextureModel(fbx_Object2World, noMedium, prims);
 
-    const int nTrianglesWall = 2;
-    int vertexIndicesWall[nTrianglesWall * 3];
-    for (int i = 0; i < nTrianglesWall * 3; i++)
-        vertexIndicesWall[i] = i;
-    const int nVerticesWall = nTrianglesWall * 3;
-    const float length_Wall = 200.f;
-    const float groundY = -200.f;
-    PBR::Point3f P_Wall[nVerticesWall] = {
-        // 底座
-        PBR::Point3f(-length_Wall, groundY, length_Wall),
-        PBR::Point3f(length_Wall, groundY, length_Wall),
-        PBR::Point3f(-length_Wall, groundY, -length_Wall),
-        PBR::Point3f(length_Wall, groundY, length_Wall),
-        PBR::Point3f(length_Wall, groundY, -length_Wall),
-        PBR::Point3f(-length_Wall, groundY, -length_Wall),
-    };
-    PBR::Transform tri_Floor2World = PBR::Transform();
-    PBR::Transform tri_World2Floor = PBR::Inverse(tri_Floor2World);
-    std::shared_ptr<PBR::TriangleMesh> meshConBox = std::make_shared<PBR::TriangleMesh>(tri_Floor2World, nTrianglesWall, vertexIndicesWall, nVerticesWall, P_Wall, nullptr, nullptr, nullptr, nullptr);
-    std::vector<std::shared_ptr<PBR::Shape>> trisFloor;
-    for (int i = 0; i < nTrianglesWall; ++i)
-        trisFloor.push_back(std::make_shared<PBR::Triangle>(&tri_Floor2World, &tri_World2Floor, false, meshConBox, i));
+    /*PBR::Transform fbx_Object2World2 = Translate(PBR::Vector3f(-8.0f, -8.0f, -15.0f)) * RotateX(0) * RotateZ(0) * Scale(3, 3, 3);
+    std::string fbxPath2 = "C:/Users/99531/Desktop/book/PBR-v1/Resources/apex_legends_car_smg.glb";
+    fbxLoader.loadModel(fbxPath2, fbx_Object2World2);
+    //fbxLoader.buildNoTextureModel(fbx_Object2World, noMedium, prims, plasticMaterial);
+    fbxLoader.buildTextureModel(fbx_Object2World2, noMedium, prims);*/
 
-    // 将物体填充到基元
-    for (int i = 0; i < nTrianglesWall; ++i)
-    {
-        prims.push_back(std::make_shared<PBR::GeometricPrimitive>(trisFloor[i], mirrorMaterial, nullptr, nullptr));
-    }
-
-    //墙和地板
-    /*const int nTrianglesWall = 2 * 5;
-    int vertexIndicesWall[nTrianglesWall * 3];
-    for (int i = 0; i < nTrianglesWall * 3; i++)
-        vertexIndicesWall[i] = i;
-    const int nVerticesWall = nTrianglesWall * 3;
-    const float length_Wall = 5.0f;
-    Point3f P_Wall[nVerticesWall] = {
-        //底座
-        PBR::Point3f(0.f,0.f,length_Wall),PBR::Point3f(length_Wall,0.f,length_Wall), PBR::Point3f(0.f,0.f,0.f),
-        PBR::Point3f(length_Wall,0.f,length_Wall),PBR::Point3f(length_Wall,0.f,0.f),PBR::Point3f(0.f,0.f,0.f),
-        //天花板
-        PBR::Point3f(0.f,length_Wall,length_Wall),PBR::Point3f(0.f,length_Wall,0.f),PBR::Point3f(length_Wall,length_Wall,length_Wall),
-        PBR::Point3f(length_Wall,length_Wall,length_Wall),PBR::Point3f(0.f,length_Wall,0.f),PBR::Point3f(length_Wall,length_Wall,0.f),
-        //后墙
-        PBR::Point3f(0.f,0.f,0.f),PBR::Point3f(length_Wall,0.f,0.f), PBR::Point3f(length_Wall,length_Wall,0.f),
-        PBR::Point3f(0.f,0.f,0.f), PBR::Point3f(length_Wall,length_Wall,0.f),PBR::Point3f(0.f,length_Wall,0.f),
-        //右墙
-        PBR::Point3f(0.f,0.f,0.f),PBR::Point3f(0.f,length_Wall,length_Wall), PBR::Point3f(0.f,0.f,length_Wall),
-        PBR::Point3f(0.f,0.f,0.f), PBR::Point3f(0.f,length_Wall,0.f),PBR::Point3f(0.f,length_Wall,length_Wall),
-        //左墙
-        PBR::Point3f(length_Wall,0.f,0.f),PBR::Point3f(length_Wall,length_Wall,length_Wall), PBR::Point3f(length_Wall,0.f,length_Wall),
-        PBR::Point3f(length_Wall,0.f,0.f), PBR::Point3f(length_Wall,length_Wall,0.f),PBR::Point3f(length_Wall,length_Wall,length_Wall)
-    };
-    PBR::Transform tri_ConBox2World = PBR::Translate(PBR::Vector3f(-0.5 * length_Wall, -0.5 * length_Wall, -0.5 * length_Wall));
-    PBR::Transform tri_World2ConBox = PBR::Inverse(tri_ConBox2World);
-    std::shared_ptr<PBR::TriangleMesh> meshConBox = std::make_shared<PBR::TriangleMesh>
-        (tri_ConBox2World, nTrianglesWall, vertexIndicesWall, nVerticesWall, P_Wall, nullptr, nullptr, nullptr, nullptr);
-    std::vector<std::shared_ptr<PBR::Shape>> trisConBox;
-    for (int i = 0; i < nTrianglesWall; ++i)
-        trisConBox.push_back(std::make_shared<PBR::Triangle>(&tri_ConBox2World, &tri_World2ConBox, false, meshConBox, i));
-
-    //将物体填充到基元
-    for (int i = 0; i < nTrianglesWall; ++i) {
-        if (i == 6 || i == 7)
-            prims.push_back(std::make_shared<PBR::GeometricPrimitive>(trisConBox[i], redWallMaterial, nullptr, noMedium));
-        else if (i == 8 || i == 9)
-            prims.push_back(std::make_shared<PBR::GeometricPrimitive>(trisConBox[i], blueWallMaterial, nullptr, noMedium));
-        else
-            prims.push_back(std::make_shared<PBR::GeometricPrimitive>(trisConBox[i], whiteWallMaterial, nullptr, noMedium));
-    }
-
-    /*
-    
-    //PBR::Transform tri_Box2World = PBR::Translate(PBR::Vector3f(0.0f, -2.f, 0.0f));
-    //getBox(tri_Box2World, 4.0, 4.0, 4.0, prims, smileFaceMaterial, nullptr);
-
-    // 生成Mesh加速结构
-    std::shared_ptr<PBR::TriangleMesh> mesh;
-    std::vector<std::shared_ptr<PBR::Shape>> tris;
-    PBR::plyInfo* plyi;
-    std::shared_ptr<Aggregate> agg;
-    PBR::Transform tri_Object2World, tri_World2Object;
-
-    tri_Object2World = Translate(Vector3f(0.0, -2.9, 0.0));
-    tri_World2Object = Inverse(tri_Object2World);
-
-    plyi = new PBR::plyInfo("C:/Users/99531/Desktop/book/PBR-v1/Resources/dragon.3d");
-
-    mesh = std::make_shared<PBR::TriangleMesh>(tri_Object2World, plyi->nTriangles, plyi->vertexIndices, plyi->nVertices, plyi->vertexArray, nullptr, nullptr, nullptr, nullptr);
-    tris.reserve(plyi->nTriangles);
-    for (int i = 0; i < plyi->nTriangles; ++i)
-        tris.push_back(std::make_shared<PBR::Triangle>(&tri_Object2World, &tri_World2Object, false, mesh, i));
-    for (int i = 0; i < plyi->nTriangles; ++i)
-        prims.push_back(std::make_shared<PBR::GeometricPrimitive>(tris[i], whiteGlassMaterial, nullptr, homoMediumInterface));*/
+    PBR::Spectrum whiteColor; whiteColor[0] = 1.0; whiteColor[1] = 1.0; whiteColor[2] = 1.0;
+    std::shared_ptr<Material> mirrorMaterial;
+    std::shared_ptr<PBR::Texture<float>> bumpMap = std::make_shared<PBR::ConstantTexture<float>>(0.0f);
+    std::shared_ptr<PBR::Texture<PBR::Spectrum>> KdWhite = std::make_shared<PBR::ConstantTexture<PBR::Spectrum>>(whiteColor);
+    mirrorMaterial = std::make_shared<PBR::MirrorMaterial>(KdWhite, bumpMap);
 
     //灯光
     std::vector<std::shared_ptr<Light>> lights;
 
-    /*int nTrianglesAreaLight = 2; //面光源数（三角形数）
-    int vertexIndicesAreaLight[6] = { 0,1,2,3,4,5 }; //面光源顶点索引
-    int nVerticesAreaLight = 6; //面光源顶点数
-    const float yPos_AreaLight = 0.0;
-    Point3f P_AreaLight[6] = { PBR::Point3f(-1.4,0.0,1.4), PBR::Point3f(-1.4,0.0,-1.4), PBR::Point3f(1.4,0.0,1.4),
-        PBR::Point3f(1.4,0.0,1.4), PBR::Point3f(-1.4,0.0,-1.4), PBR::Point3f(1.4,0.0,-1.4) };
-    //面光源的变换矩阵
-    PBR::Transform tri_Object2World_AreaLight = PBR::Translate(PBR::Vector3f(0.0f, 2.45f, 0.0f));
+    std::shared_ptr<Material> whiteLightMaterial;
+    whiteLightMaterial = std::make_shared<PBR::MatteMaterial>(KdWhite, sigma, bumpMap);
+    int nTrianglesAreaLight = 2; 
+    int vertexIndicesAreaLight[6] = { 0,1,2,3,4,5 }; 
+    int nVerticesAreaLight = 6; 
+    const float lightSize = 30.f; //
+    Point3f P_AreaLight[6] = {
+        PBR::Point3f(-lightSize, 0.0,  lightSize), PBR::Point3f(-lightSize, 0.0, -lightSize), PBR::Point3f(lightSize, 0.0,  lightSize),
+        PBR::Point3f(lightSize, 0.0,  lightSize), PBR::Point3f(-lightSize, 0.0, -lightSize), PBR::Point3f(lightSize, 0.0, -lightSize)
+    };
+    PBR::Transform tri_Object2World_AreaLight =
+        PBR::Translate(PBR::Vector3f(0.0f, 40.0f, 0.0f)) *
+        PBR::RotateX(45.f);                               
     PBR::Transform tri_World2Object_AreaLight = PBR::Inverse(tri_Object2World_AreaLight);
-    //构造三角面片集
+
     std::shared_ptr<PBR::TriangleMesh> meshAreaLight = std::make_shared<PBR::TriangleMesh>
         (tri_Object2World_AreaLight, nTrianglesAreaLight, vertexIndicesAreaLight, nVerticesAreaLight, P_AreaLight, nullptr, nullptr, nullptr, nullptr);
+
     std::vector<std::shared_ptr<PBR::Shape>> trisAreaLight;
-    //生成三角形数组
     for (int i = 0; i < nTrianglesAreaLight; ++i)
         trisAreaLight.push_back(std::make_shared<PBR::Triangle>(&tri_Object2World_AreaLight, &tri_World2Object_AreaLight, false, meshAreaLight, i));
-    //填充光源类物体到基元
+
+    PBR::Spectrum greyLight;
+    greyLight[0] = 50.f; // R
+    greyLight[1] = 50.f; // G
+    greyLight[2] = 50.f; // B
+
     for (int i = 0; i < nTrianglesAreaLight; ++i) {
         std::shared_ptr<PBR::AreaLight> area =
-            std::make_shared<PBR::DiffuseAreaLight>(tri_Object2World_AreaLight, noMedium, PBR::Spectrum(5.f), 5, trisAreaLight[i], false);
+            std::make_shared<PBR::DiffuseAreaLight>(tri_Object2World_AreaLight, noMedium, greyLight, 5, trisAreaLight[i], false);
         lights.push_back(area);
         prims.push_back(std::make_shared<PBR::GeometricPrimitive>(trisAreaLight[i], whiteLightMaterial, area, noMedium));
-    }*/
+    }
 
-    Transform InfinityLightToWorld = RotateX(-90) * RotateY(-0) * RotateZ(-50);
+
+    /*Transform InfinityLightToWorld = RotateX(90) * RotateY(-0) * RotateZ(-50);
     Spectrum power(1.f);
     std::shared_ptr<Light> skyBoxLight =
         std::make_shared<InfiniteAreaLight>(InfinityLightToWorld, power,
-            10, "C:/Users/99531/Desktop/book/PBR-v1/Resources/Free8kalienatmosphereHDRI.hdr");
-    lights.push_back(skyBoxLight);
+            10, "C:/Users/99531/Desktop/book/PBR-v1/Resources/sky3.png");
+    lights.push_back(skyBoxLight);*/
 
     std::shared_ptr<Aggregate> agg;
     agg = std::make_shared<BVHAccel>(prims, 1, BVHAccel::SplitMethod::SAH);
@@ -397,7 +375,7 @@ int main(int argc, char* argv[]) {
     Bounds2i ScreenBound(Point2i(0, 0), Point2i(WIDTH, HEIGHT));
     //积分器
     std::shared_ptr<Integrator> integrator = std::make_shared<VolPathIntegrator>(
-            10, cam, mainSampler, ScreenBound, 1.f, "uniform", framebuffer);
+            15, cam, mainSampler, ScreenBound, 0.8f, "uniform", framebuffer);
     /*std::shared_ptr<Integrator> integrator = std::make_shared<PathIntegrator>(
             10, cam, mainSampler, ScreenBound, 0.8f, "uniform", framebuffer
             );*/
@@ -416,7 +394,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Render finished." << std::endl;
 
     // 保存结果到 PNG 文件
-    const char* filename = "PathTracing21.png";
+    const char* filename = "PathTracing26.png";
     int channels = 4;
     int stride_in_bytes = WIDTH * channels;
     stbi_flip_vertically_on_write(true);

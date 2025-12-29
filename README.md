@@ -24,49 +24,163 @@
   - 透视相机 (`PerspectiveCamera`)。
   - 正交相机 (`OrthographicCamera`)。
 
+## 核心特性-V2
+
+随着项目的迭代，渲染器已从 Whitted-Style 升级为完整的基于物理的路径追踪器 (PBRT)，并添加了以下高级功能：
+
+* **渲染算法**:  `Integrator` 模块现在包含多种渲染算法：
+    * `DirectLightingIntegrator` (直接光照积分器): 一种非递归的积分器，仅计算直接光照，用于调试和性能对比。
+    * `PathIntegrator` (路径追踪器): 支持全局光照，通过蒙特卡洛方法求解渲染方程，实现精确的间接光照。
+    * `VolPathIntegrator` (体积路径追踪器): 在 `PathIntegrator` 基础上增加了对参与介质 的支持。
+* **PBR 材质系统**: 引入了基于**微表面理论 (Microfacet Theory)** 的现代 PBR 材质，取代了 V1 的简单材质：
+    * 实现了 `MetalMaterial` (金属)、`GlassMaterial` (玻璃) 和 `PlasticMaterial` (塑料) 等。
+    * 核心在于 `Microfacet.h`，它定义了微表面分布函数 (Trowbridge-Reitz / GGX) 和遮挡-阴影项 (Smith G1)。
+    * 能够通过“粗糙度” (Roughness) 参数控制表面从光滑镜面到粗糙漫反射的平滑过渡。
+* **参与介质 (Volume Rendering)**: 新增 `Media` 模块，支持光线在介质中传播：
+    * 实现了 `HomogeneousMedium` (均匀介质) 和 `GridDensityMedium` (栅格密度介质)。
+* **高级纹理 (Advanced Texturing)**:
+    * `Texture` 模块已扩展，支持 `ImageTexture` (图像纹理) 加载。
+    * 实现了 `MIPMap` (多级渐远纹理) 来进行高质量的纹理抗锯齿过滤。
+* **光线微分 (Ray Differentials)**:
+    * `Camera` (相机) 系统现在支持生成**光线微分** (`ray.dx`, `ray.dy`)。
+    * 这些微分信息在光线追踪中传递，用于在 `SurfaceInteraction` 处计算像素在 UV 空间上的“足迹” (footprint)，以供 `MIPMap` 查询正确的层级，实现高质量的纹理过滤。
+* **高级天空盒**:
+    * 实现 `InfiniteAreaLight` (无限面光源)。
+    * 利用 `LightDistrib` (2D 光源分布) 对 HDR 环境贴图进行预处理，实现了基于亮度的**重要性采样 (Importance Sampling)**，大幅提升了 IBL 的收敛速度，显著减少噪点。
+* **模型加载**: 新增 `ModelLoad` 抽象，提供了比 `plyRead.h` 更通用的复杂模型加载和管理功能。
+* **其他**：增加了色调映射处理。这能将渲染出的高动态范围 (HDR) `Spectrum` 颜色平滑地压缩到 0-255 范围内，防止高光区域过曝截断，保留更多亮部和暗部细节。
+
 ## 项目结构
+
+（已根据 V2 文件列表更新）
 
 ```
 .
-├── Accelerator/   # 加速结构
-│   └── BVHAccel.h/cpp
-├── Camera/        # 相机模型
-│   ├── Perspective.h/cpp
-│   └── Orthographic.h/cpp
-├── Core/          # 渲染器核心类
-│   ├── Scene.h/cpp        (场景)
-│   ├── Primitive.h/cpp    (图元)
-│   ├── Interaction.h/cpp  (光线交点信息)
-│   ├── Spectrum.h/cpp     (光谱/颜色)
-│   ├── Transform.h/cpp    (变换)
-│   ├── FrameBuffer.h/cpp  (帧缓冲/画布)
-│   ├── Geometry.h/cpp       (几何学基础)
-│   └── PBR.h            (PBR相关定义、前向声明)
-├── include/       # 外部依赖
-│   └── stb_image.h/write.h
-├── Integrator/    # 积分器 (渲染算法)
-│   └── WhittedIntegrator.h/cpp
-├── Light/         # 光源
-│   ├── PointLight.h/cpp
-│   ├── DiffuseLight.h/cpp (面光源)
-│   └── SkyBoxLight.h/cpp  (天空盒)
-├── Material/      # 材质模型
-│   ├── MatteMaterial.h/cpp
-│   ├── Mirror.h/cpp
-│   └── Fresnel.h/cpp
-├── Sampler/       # 采样器
-│   ├── Sampler.h/cpp
-│   ├── Halton.h/cpp
-│   └── SobolMatrices.h/cpp
-├── Shape/         # 几何形状
-│   ├── Sphere.h/cpp
-│   ├── Triangle.h/cpp
-│   └── plyRead.h
-├── Texture/       # 纹理
-│   └── ConstantTexture.h/cpp
-├── Resources/     # 资源文件 (.hdr, .ply 等)
-└── Main/
-    └── main.cpp     (主程序入口)
+├── Accelerator/
+│   ├── BVHAccel.cpp
+│   ├── BVHAccel.h
+│   └── README.md
+├── Camera/
+│   ├── Camera.cpp
+│   ├── Camera.h
+│   ├── Orthographic.cpp
+│   ├── Orthographic.h
+│   ├── Perspective.cpp
+│   ├── Perspective.h
+│   └── README.md
+├── Core/
+│   ├── FrameBuffer.cpp
+│   ├── FrameBuffer.h
+│   ├── Geometry.h
+│   ├── Interaction.cpp
+│   ├── Interaction.h
+│   ├── Memory.h
+│   ├── PBR.h
+│   ├── Primitive.cpp
+│   ├── Primitive.h
+│   ├── README.md
+│   ├── Scene.cpp
+│   ├── Scene.h
+│   ├── Spectrum.cpp
+│   ├── Spectrum.h
+│   ├── Transform.cpp
+│   └── Transform.h
+├── include/
+│   ├── stb_image.h
+│   ├── stb_image_resize.h
+│   └── stb_image_write.h
+├── Integrator/
+│   ├── DirectLightingIntegrator.cpp
+│   ├── DirectLightingIntegrator.h
+│   ├── Integrator.cpp
+│   ├── Integrator.h
+│   ├── PathIntegrator.cpp
+│   ├── PathIntegrator.h
+│   ├── README.md
+│   ├── VolPathIntegrator.cpp
+│   ├── VolPathIntegrator.h
+│   ├── WhittedIntegrator.cpp
+│   └── WhittedIntegrator.h
+├── Light/
+│   ├── DiffuseLight.cpp
+│   ├── DiffuseLight.h
+│   ├── InfiniteAreaLight.cpp
+│   ├── InfiniteAreaLight.h
+│   ├── Light.cpp
+│   ├── Light.h
+│   ├── LightDistrib.cpp
+│   ├── LightDistrib.h
+│   ├── PointLight.cpp
+│   ├── PointLight.h
+│   ├── README.md
+│   ├── SkyBoxLight.cpp
+│   └── SkyBoxLight.h
+├── Main/
+│   ├── main.cpp
+│   └── README.md
+├── Material/
+│   ├── Fresnel.cpp
+│   ├── Fresnel.h
+│   ├── GlassMaterial.cpp
+│   ├── GlassMaterial.h
+│   ├── Material.cpp
+│   ├── Material.h
+│   ├── MatteMaterial.cpp
+│   ├── MatteMaterial.h
+│   ├── MetalMaterial.cpp
+│   ├── MetalMaterial.h
+│   ├── Microfacet.cpp
+│   ├── Microfacet.h
+│   ├── Mirror.cpp
+│   ├── Mirror.h
+│   ├── PlasticMaterial.cpp
+│   ├── PlasticMaterial.h
+│   ├── README.md
+│   ├── Reflection.cpp
+│   └── Reflection.h
+├── Media/
+│   ├── GridDensityMedium.cpp
+│   ├── GridDensityMedium.h
+│   ├── HomogeneousMedium.cpp
+│   ├── HomogeneousMedium.h
+│   ├── Medium.cpp
+│   └── Medium.h
+├── Sampler/
+│   ├── ClockRand.cpp
+│   ├── ClockRand.h
+│   ├── Halton.cpp
+│   ├── Halton.h
+│   ├── LowDiscrepancy.cpp
+│   ├── LowDiscrepancy.h
+│   ├── README.md
+│   ├── RNG.h
+│   ├── Sampler.cpp
+│   ├── Sampler.h
+│   ├── Sampling.cpp
+│   ├── Sampling.h
+│   ├── SobolMatrices.cpp
+│   └── SobolMatrices.h
+├── Shape/
+│   ├── ModelLoad.cpp
+│   ├── ModelLoad.h
+│   ├── plyRead.h
+│   ├── README.md
+│   ├── Shape.cpp
+│   ├── Shape.h
+│   ├── Sphere.cpp
+│   ├── Sphere.h
+│   ├── Triangle.cpp
+│   └── Triangle.h
+└── Texture/
+    ├── ConstantTexture.cpp
+    ├── ConstantTexture.h
+    ├── ImageTexture.cpp
+    ├── ImageTexture.h
+    ├── MIPMap.cpp
+    ├── MIPMap.h
+    ├── README.md
+    ├── Texture.cpp
+    └── Texture.h
 ```
 
 ## 使用渲染器输出的示例

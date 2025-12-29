@@ -18,7 +18,7 @@
 #include <vector>
 #include <map> // 包含 map
 
-namespace PBR {
+/*namespace PBR {
 
 
 	class ModelLoad {
@@ -44,5 +44,29 @@ namespace PBR {
 		void ModelLoad::buildTextureModel(Transform& tri_Object2World, const MediumInterface& mediumInterface,
 			std::vector<std::shared_ptr<Primitive>>& prims);
 	};
+}*/
+
+namespace PBR {
+
+	class ModelLoad {
+	public:
+		std::vector<std::shared_ptr<TriangleMesh>> meshes;
+		// 新增：存储每个网格对应的材质索引
+		std::vector<unsigned int> meshMaterialIndices;
+		// 新增：存储从 glTF 加载的所有材质
+		std::vector<std::shared_ptr<Material>> loadedMaterials;
+
+		std::string directory;
+
+		void loadModel(std::string path, const Transform& ObjectToWorld);
+		void processNode(aiNode* node, const aiScene* scene, const Transform& ObjectToWorld);
+		std::shared_ptr<TriangleMesh> processMesh(aiMesh* mesh, const aiScene* scene, const Transform& ObjectToWorld);
+
+		void buildNoTextureModel(Transform& tri_Object2World, const MediumInterface& mediumInterface,
+			std::vector<std::shared_ptr<Primitive>>& prims, std::shared_ptr<Material> material);
+		void buildTextureModel(Transform& tri_Object2World, const MediumInterface& mediumInterface,
+			std::vector<std::shared_ptr<Primitive>>& prims);
+	};
 }
+
 #endif

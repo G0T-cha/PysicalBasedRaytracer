@@ -1,9 +1,13 @@
 {
   "ExpandedNodes": [
     "",
+    "\\Integrator",
+    "\\Light",
     "\\Material",
-    "\\Texture"
+    "\\Media",
+    "\\Sampler",
+    "\\Shape"
   ],
-  "SelectedNode": "\\Texture\\MIPMap.h",
+  "SelectedNode": "\\Shape\\ModelLoad.cpp",
   "PreviewInSolutionExplorer": false
 }

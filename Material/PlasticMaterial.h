@@ -13,19 +13,20 @@ class PlasticMaterial : public Material {
     PlasticMaterial(const std::shared_ptr<Texture<Spectrum>> &Kd,
                     const std::shared_ptr<Texture<Spectrum>> &Ks,
                     const std::shared_ptr<Texture<float>> &roughness,
-                    const std::shared_ptr<Texture<float>> &bumpMap,
+                    const std::shared_ptr<Texture<Spectrum>>& normalMap,
                     bool remapRoughness)
         : Kd(Kd),
           Ks(Ks),
           roughness(roughness),
-          bumpMap(bumpMap),
+          normalMap(normalMap),
           remapRoughness(remapRoughness) {}
     void ComputeScatteringFunctions(SurfaceInteraction *si, TransportMode mode,
                                     bool allowMultipleLobes) const;
 
   private:
     std::shared_ptr<Texture<Spectrum>> Kd, Ks;
-    std::shared_ptr<Texture<float>> roughness, bumpMap;
+    std::shared_ptr<Texture<float>> roughness;
+    std::shared_ptr<Texture<Spectrum>> normalMap;
     const bool remapRoughness;
 };
 
