@@ -191,7 +191,7 @@ V1:
 
 V2:
 
-![PathTracing_Kairi](D:\Development\Game\PBR-v1\PathTracing_Kairi.png)
+![PathTracing_Kairi](PathTracing_Kairi.png)
 
 ## 未来
 
