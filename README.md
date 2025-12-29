@@ -185,7 +185,13 @@
 
 ## 使用渲染器输出的示例
 
+V1:
+
 ![render_final_parallel](render_final_parallel.png)
+
+V2:
+
+![PathTracing_Kairi](D:\Development\Game\PBR-v1\PathTracing_Kairi.png)
 
 ## 未来
 
